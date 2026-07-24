@@ -38,6 +38,7 @@ bin/
 ### 컴파일 산출물 / 로그 ###
 *.class
 *.log
+logs/
 
 ### JVM 크래시 로그 ###
 hs_err_pid*
@@ -45,6 +46,9 @@ replay_pid*
 
 ### 로컬 환경 변수 / 시크릿 ###
 .env
+# 개인 로컬 오버라이드용 프로필 (팀 공유 설정은 application.yaml에)
+application-local*.yml
+application-local*.yaml
 
 ### macOS ###
 .DS_Store
