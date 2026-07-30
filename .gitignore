@@ -44,6 +44,11 @@ logs/
 hs_err_pid*
 replay_pid*
 
+### 데이터 파이프라인 산출물 (원본/명부 데이터는 커밋 금지) ###
+data-pipeline/output/
+data-pipeline/cache/
+__pycache__/
+
 ### 로컬 환경 변수 / 시크릿 ###
 .env
 # 개인 로컬 오버라이드용 프로필 (팀 공유 설정은 application.yaml에)
