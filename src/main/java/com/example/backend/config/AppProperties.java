@@ -1,5 +1,6 @@
 package com.example.backend.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,6 +11,7 @@ public class AppProperties {
 
 	private final Api api = new Api();
 	private final MasterData masterData = new MasterData();
+	private final Topis topis = new Topis();
 
 	public Api getApi() {
 		return api;
@@ -17,6 +19,10 @@ public class AppProperties {
 
 	public MasterData getMasterData() {
 		return masterData;
+	}
+
+	public Topis getTopis() {
+		return topis;
 	}
 
 	public static class Api {
@@ -78,6 +84,64 @@ public class AppProperties {
 
 		public void setRouteStopFile(String routeStopFile) {
 			this.routeStopFile = routeStopFile;
+		}
+	}
+
+	public static class Topis {
+
+		private boolean enabled = true;
+		private String baseUrl = "http://ws.bus.go.kr/api/rest";
+		private String serviceKey = "";
+		private Duration connectTimeout = Duration.ofSeconds(3);
+		private Duration requestTimeout = Duration.ofSeconds(5);
+		private Duration cacheTtl = Duration.ofSeconds(20);
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getBaseUrl() {
+			return baseUrl;
+		}
+
+		public void setBaseUrl(String baseUrl) {
+			this.baseUrl = baseUrl;
+		}
+
+		public String getServiceKey() {
+			return serviceKey;
+		}
+
+		public void setServiceKey(String serviceKey) {
+			this.serviceKey = serviceKey;
+		}
+
+		public Duration getConnectTimeout() {
+			return connectTimeout;
+		}
+
+		public void setConnectTimeout(Duration connectTimeout) {
+			this.connectTimeout = connectTimeout;
+		}
+
+		public Duration getRequestTimeout() {
+			return requestTimeout;
+		}
+
+		public void setRequestTimeout(Duration requestTimeout) {
+			this.requestTimeout = requestTimeout;
+		}
+
+		public Duration getCacheTtl() {
+			return cacheTtl;
+		}
+
+		public void setCacheTtl(Duration cacheTtl) {
+			this.cacheTtl = cacheTtl;
 		}
 	}
 }

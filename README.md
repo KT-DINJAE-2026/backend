@@ -103,6 +103,19 @@ H2 프로필의 데이터 파일은 `.local/backend-smoke.mv.db`에 생성되며
 
 Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다. API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
 
+## 서울시 버스 도착정보 연동
+
+TOPIS `getArrInfoByRoute`를 사용해 정류소·노선·정류소 순번별 첫 번째와 두 번째 도착 예정 차량을 조회합니다. `traTime1/2`는 초 단위로 해석해 올림한 분 단위 도착시간을 만들고, `vehId1/2`는 차량 단위 `tripId`, `busType1/2`는 일반·저상·굴절버스 구분으로 변환합니다. 같은 정류소·노선·순번 조회는 기본 20초 동안 메모리에 캐시합니다.
+
+인증키는 저장소에 커밋하지 않습니다. 공공데이터포털의 **일반 인증키(Decoding)** 값을 사용해 `.env.example`을 `.env`로 복사한 뒤 값을 입력합니다. `.env`는 Git에서 제외됩니다.
+
+```properties
+SEOUL_BUS_API_KEY=발급받은_일반_인증키_Decoding
+SEOUL_BUS_API_ENABLED=true
+```
+
+연결 제한시간은 3초, 응답 제한시간은 5초입니다. 운영 환경에서는 동일한 이름의 환경 변수나 비밀 관리 서비스로 주입합니다. 연동을 일시적으로 끄려면 `SEOUL_BUS_API_ENABLED=false`를 사용합니다.
+
 ## 기반정보 적재
 
 `STTN`, `ROUTE`, `ROUTESTTN` 파일은 UTF-8, `|` 구분, 헤더 없음 형식으로 읽습니다. 서로 다른 날짜 파일을 섞지 말고 같은 기준일의 세 파일을 지정해야 합니다. 적재는 기본적으로 꺼져 있으며 명시적으로 활성화한 실행에서만 MySQL에 upsert합니다.
@@ -124,7 +137,7 @@ Docker/MySQL 없이 H2 스모크 DB에 적재할 때는 마지막 명령에 H2 �
 
 `route_stop.stop_order`로 출발 정류장보다 뒤에 있는 도착 정류장만 직통으로 판정합니다. 순환 노선에서 동일 정류장이 여러 번 등장해도 정방향 순서 쌍이 존재하면 직통으로 처리합니다.
 
-현재 구현 범위는 인수인계 작업 순서의 1~3단계입니다. `POST /api/v1/journeys/predictions`는 TOPIS 도착정보와 AI 배치 사전계산 산출물 확보 후 연결합니다.
+현재 구현 범위는 인수인계 작업 순서의 1~4단계입니다. `POST /api/v1/journeys/predictions`는 TOPIS 도착정보와 AI 배치 사전계산 산출물을 결합하는 다음 단계에서 연결합니다.
 
 ## 컨벤션 메모
 
