@@ -12,6 +12,7 @@ public class AppProperties {
 	private final Api api = new Api();
 	private final MasterData masterData = new MasterData();
 	private final Topis topis = new Topis();
+	private final Prediction prediction = new Prediction();
 
 	public Api getApi() {
 		return api;
@@ -23,6 +24,10 @@ public class AppProperties {
 
 	public Topis getTopis() {
 		return topis;
+	}
+
+	public Prediction getPrediction() {
+		return prediction;
 	}
 
 	public static class Api {
@@ -142,6 +147,83 @@ public class AppProperties {
 
 		public void setCacheTtl(Duration cacheTtl) {
 			this.cacheTtl = cacheTtl;
+		}
+	}
+
+	public static class Prediction {
+
+		public enum SampleBasis {
+			BOARDING_STOP,
+			OD_PAIR
+		}
+
+		public enum UserTypeMode {
+			FIXED,
+			SELECT
+		}
+
+		private SampleBasis sampleBasis = SampleBasis.BOARDING_STOP;
+		private UserTypeMode userTypeMode = UserTypeMode.FIXED;
+		private String fixedUserTypeCode = "04";
+		private String defaultWeather = "맑음";
+		private int minSampleCount = 30;
+		private int mediumConfidenceSampleCount = 100;
+		private int highConfidenceSampleCount = 1000;
+
+		public SampleBasis getSampleBasis() {
+			return sampleBasis;
+		}
+
+		public void setSampleBasis(SampleBasis sampleBasis) {
+			this.sampleBasis = sampleBasis;
+		}
+
+		public UserTypeMode getUserTypeMode() {
+			return userTypeMode;
+		}
+
+		public void setUserTypeMode(UserTypeMode userTypeMode) {
+			this.userTypeMode = userTypeMode;
+		}
+
+		public String getFixedUserTypeCode() {
+			return fixedUserTypeCode;
+		}
+
+		public void setFixedUserTypeCode(String fixedUserTypeCode) {
+			this.fixedUserTypeCode = fixedUserTypeCode;
+		}
+
+		public String getDefaultWeather() {
+			return defaultWeather;
+		}
+
+		public void setDefaultWeather(String defaultWeather) {
+			this.defaultWeather = defaultWeather;
+		}
+
+		public int getMinSampleCount() {
+			return minSampleCount;
+		}
+
+		public void setMinSampleCount(int minSampleCount) {
+			this.minSampleCount = minSampleCount;
+		}
+
+		public int getMediumConfidenceSampleCount() {
+			return mediumConfidenceSampleCount;
+		}
+
+		public void setMediumConfidenceSampleCount(int mediumConfidenceSampleCount) {
+			this.mediumConfidenceSampleCount = mediumConfidenceSampleCount;
+		}
+
+		public int getHighConfidenceSampleCount() {
+			return highConfidenceSampleCount;
+		}
+
+		public void setHighConfidenceSampleCount(int highConfidenceSampleCount) {
+			this.highConfidenceSampleCount = highConfidenceSampleCount;
 		}
 	}
 }

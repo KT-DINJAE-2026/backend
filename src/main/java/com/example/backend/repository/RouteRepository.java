@@ -35,4 +35,18 @@ public interface RouteRepository extends JpaRepository<RouteEntity, String> {
 			@Param("originStopId") String originStopId,
 			@Param("destinationStopId") String destinationStopId
 	);
+
+	@Query("""
+			select distinct route
+			from RouteEntity route
+			join RouteStopEntity firstStop on firstStop.route = route
+			join RouteStopEntity secondStop on secondStop.route = route
+			where firstStop.stop.id = :firstStopId
+				and secondStop.stop.id = :secondStopId
+			order by route.number
+			""")
+	List<RouteEntity> findRoutesConnectingStops(
+			@Param("firstStopId") String firstStopId,
+			@Param("secondStopId") String secondStopId
+	);
 }

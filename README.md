@@ -100,6 +100,7 @@ H2 프로필의 데이터 파일은 `.local/backend-smoke.mv.db`에 생성되며
 | `GET` | `/health` | 서버 상태 확인 |
 | `GET` | `/api/v1/stops/{stopId}/context` | QR 출발 정류장과 초기 도착 정류장 조회 |
 | `GET` | `/api/v1/stops/search?originStopId=&query=` | 정류장명·ARS·노선번호 검색 및 직통 노선 조회 |
+| `POST` | `/api/v1/journeys/predictions` | 실시간 도착 차량과 AI 배치 예측을 결합한 직통 여정 분석 |
 
 Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다. API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
 
@@ -137,7 +138,22 @@ Docker/MySQL 없이 H2 스모크 DB에 적재할 때는 마지막 명령에 H2 �
 
 `route_stop.stop_order`로 출발 정류장보다 뒤에 있는 도착 정류장만 직통으로 판정합니다. 순환 노선에서 동일 정류장이 여러 번 등장해도 정방향 순서 쌍이 존재하면 직통으로 처리합니다.
 
-현재 구현 범위는 인수인계 작업 순서의 1~4단계입니다. `POST /api/v1/journeys/predictions`는 TOPIS 도착정보와 AI 배치 사전계산 산출물을 결합하는 다음 단계에서 연결합니다.
+## 여정 예측 데이터
+
+`prediction` 테이블은 AI가 배치로 사전계산한 결과를 저장합니다. 조회 키는 `(route_id, board_stop_id, alight_stop_id, weekday, prediction_hour, weather, usertype_code)`이며, 모델 출력인 입석 시간·위험 단계와 승차 정류장/OD 기준 표본 수, TCD 기반 이동시간을 함께 보관합니다.
+
+기본 설정은 경로 사용자 코드 `04`, 날씨 `맑음`, 승차 정류장 표본 기준입니다. AI 배치가 `prediction` 테이블에 현재 요일·시간·날씨 조합을 적재해야 실제 차량이 응답에 포함됩니다.
+
+```properties
+PREDICTION_SAMPLE_BASIS=BOARDING_STOP
+PREDICTION_USER_TYPE_MODE=FIXED
+PREDICTION_USER_TYPE_CODE=04
+PREDICTION_DEFAULT_WEATHER=맑음
+```
+
+`PREDICTION_SAMPLE_BASIS`는 `BOARDING_STOP` 또는 `OD_PAIR`로 전환할 수 있습니다. 표본이 30건 미만이면 `INSUFFICIENT_DATA`, 30/100/1,000건을 기준으로 신뢰도를 `LOW`/`MEDIUM`/`HIGH`로 변환합니다. 성공 응답에서는 `standingSeconds`가 걸치는 정류장 구간 전체를 입석 구간으로 올림하고, 구간별 시간 합계와 입석 부담 시간 합계를 서버에서 일치시킵니다.
+
+TOPIS 인증·제공기관 장애가 발생하면 예측 요청 전체를 500으로 바꾸지 않고 실시간 차량 목록만 비웁니다. 인증이 정상화되면 코드 변경 없이 동일한 엔드포인트에서 실제 `tripId`, 도착시간, 저상버스 여부가 결합됩니다.
 
 ## 컨벤션 메모
 

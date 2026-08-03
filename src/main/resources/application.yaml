@@ -24,6 +24,14 @@ app:
     connect-timeout: 3s
     request-timeout: 5s
     cache-ttl: 20s
+  prediction:
+    sample-basis: ${PREDICTION_SAMPLE_BASIS:BOARDING_STOP}
+    user-type-mode: ${PREDICTION_USER_TYPE_MODE:FIXED}
+    fixed-user-type-code: ${PREDICTION_USER_TYPE_CODE:04}
+    default-weather: ${PREDICTION_DEFAULT_WEATHER:맑음}
+    min-sample-count: 30
+    medium-confidence-sample-count: 100
+    high-confidence-sample-count: 1000
 
 springdoc:
   swagger-ui:
