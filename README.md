@@ -107,10 +107,10 @@ Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 �
 
 TOPIS `getArrInfoByRoute`를 사용해 정류소·노선·정류소 순번별 첫 번째와 두 번째 도착 예정 차량을 조회합니다. `traTime1/2`는 초 단위로 해석해 올림한 분 단위 도착시간을 만들고, `vehId1/2`는 차량 단위 `tripId`, `busType1/2`는 일반·저상·굴절버스 구분으로 변환합니다. 같은 정류소·노선·순번 조회는 기본 20초 동안 메모리에 캐시합니다.
 
-인증키는 저장소에 커밋하지 않습니다. 공공데이터포털의 **일반 인증키(Decoding)** 값을 사용해 `.env.example`을 `.env`로 복사한 뒤 값을 입력합니다. `.env`는 Git에서 제외됩니다.
+인증키는 저장소에 커밋하지 않습니다. 공공데이터포털의 **일반 인증키(Encoding 또는 Decoding)** 값을 사용해 `.env.example`을 `.env`로 복사한 뒤 값을 입력합니다. 클라이언트가 형식을 판별해 Encoding 키의 이중 인코딩을 방지하며, `.env`는 Git에서 제외됩니다.
 
 ```properties
-SEOUL_BUS_API_KEY=발급받은_일반_인증키_Decoding
+SEOUL_BUS_API_KEY=발급받은_일반_인증키
 SEOUL_BUS_API_ENABLED=true
 ```
 

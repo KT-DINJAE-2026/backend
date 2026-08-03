@@ -16,6 +16,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -35,6 +36,9 @@ public class TopisArrivalClient implements ArrivalClient {
 
 	private static final Logger log = LoggerFactory.getLogger(TopisArrivalClient.class);
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+	private static final Pattern ENCODED_SERVICE_KEY = Pattern.compile(
+			"(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+"
+	);
 	private static final DateTimeFormatter PROVIDED_AT_FORMAT = new DateTimeFormatterBuilder()
 			.appendPattern("yyyy-MM-dd HH:mm:ss")
 			.optionalStart()
@@ -115,7 +119,7 @@ public class TopisArrivalClient implements ArrivalClient {
 
 	private URI requestUri(String stopId, String routeId, int stopOrder) {
 		String baseUrl = properties.getBaseUrl().replaceAll("/+$", "");
-		String query = "serviceKey=" + encode(properties.getServiceKey())
+		String query = "serviceKey=" + encodeServiceKey(properties.getServiceKey())
 				+ "&stId=" + encode(stopId)
 				+ "&busRouteId=" + encode(routeId)
 				+ "&ord=" + stopOrder;
@@ -128,7 +132,11 @@ public class TopisArrivalClient implements ArrivalClient {
 					.parse(new InputSource(new StringReader(body)));
 			String headerCode = text(document.getDocumentElement(), "headerCd");
 			if (!"0".equals(headerCode)) {
-				return handleApiCode(headerCode, fallbackTime);
+				return handleApiCode(
+						headerCode,
+						text(document.getDocumentElement(), "headerMsg"),
+						fallbackTime
+				);
 			}
 
 			OffsetDateTime providedAt = parseProvidedAt(
@@ -162,7 +170,17 @@ public class TopisArrivalClient implements ArrivalClient {
 		}
 	}
 
-	private ArrivalLookupResult handleApiCode(String headerCode, OffsetDateTime providedAt) {
+	private ArrivalLookupResult handleApiCode(
+			String headerCode,
+			String headerMessage,
+			OffsetDateTime providedAt
+	) {
+		if (headerMessage.contains("Key인증실패") || headerMessage.contains("SERVICE KEY")) {
+			throw new TopisApiException(
+					TopisApiException.Reason.AUTHENTICATION,
+					"서울시 버스 API 인증 또는 활용 승인을 확인해 주세요."
+			);
+		}
 		return switch (headerCode) {
 			case "6" -> ArrivalLookupResult.empty(ArrivalLookupStatus.TEMPORARILY_UNAVAILABLE, providedAt);
 			case "8" -> ArrivalLookupResult.empty(ArrivalLookupStatus.SERVICE_ENDED, providedAt);
@@ -286,5 +304,18 @@ public class TopisArrivalClient implements ArrivalClient {
 
 	private static String encode(String value) {
 		return URLEncoder.encode(value, StandardCharsets.UTF_8);
+	}
+
+	private static String encodeServiceKey(String value) {
+		if (!value.contains("%")) {
+			return encode(value);
+		}
+		if (!ENCODED_SERVICE_KEY.matcher(value).matches()) {
+			throw new TopisApiException(
+					TopisApiException.Reason.CONFIGURATION,
+					"서울시 버스 API Encoding 인증키 형식을 확인해 주세요."
+			);
+		}
+		return value;
 	}
 }

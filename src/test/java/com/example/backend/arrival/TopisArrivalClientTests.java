@@ -94,6 +94,35 @@ class TopisArrivalClientTests {
 	}
 
 	@Test
+	void doesNotEncodeAnAlreadyEncodedServiceKeyTwice() {
+		appProperties.getTopis().setServiceKey("encoded%2Bkey%2Fvalue%3D%3D");
+		responseBody.set(successResponse());
+
+		client.getArrivals("121000019", "100100027", 35);
+
+		assertThat(rawQuery.get())
+				.contains("serviceKey=encoded%2Bkey%2Fvalue%3D%3D")
+				.doesNotContain("%252B", "%252F", "%253D");
+	}
+
+	@Test
+	void mapsAuthenticationFailureReturnedInsideASuccessfulHttpResponse() {
+		responseBody.set("""
+				<ServiceResult>
+				  <msgHeader>
+				    <headerCd>7</headerCd>
+				    <headerMsg>Key인증실패: SERVICE KEY IS NOT REGISTERED ERROR.</headerMsg>
+				  </msgHeader>
+				</ServiceResult>
+				""");
+
+		assertThatThrownBy(() -> client.getArrivals("121000019", "100100027", 35))
+				.isInstanceOf(TopisApiException.class)
+				.satisfies(exception -> assertThat(((TopisApiException) exception).reason())
+						.isEqualTo(TopisApiException.Reason.AUTHENTICATION));
+	}
+
+	@Test
 	void rejectsMissingServiceKeyBeforeSendingARequest() {
 		appProperties.getTopis().setServiceKey("");
 
