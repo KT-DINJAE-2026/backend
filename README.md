@@ -11,7 +11,8 @@ KT 디인재 프로젝트 백엔드 레포지토리
 | Build | Gradle 9.5.1 (Wrapper 포함 — 별도 설치 불필요) |
 | Web | Spring Web MVC (REST API) |
 | ORM | Spring Data JPA (Hibernate) |
-| DB | MySQL (로컬은 Docker Compose로 자동 기동) |
+| DB | MySQL 8.4 (로컬은 Docker Compose로 자동 기동), H2 (테스트·스모크 전용) |
+| API 문서 | springdoc-openapi 3.0.1 (Swagger UI) |
 | 기타 | Bean Validation, Lombok, Spring Boot DevTools |
 
 ## 사전 요구 사항
@@ -56,18 +57,27 @@ Windows에서 저장소 상위 경로에 한글이 포함돼 Gradle 테스트 �
 backend/
 ├── build.gradle          # 의존성·빌드 설정
 ├── compose.yaml          # 로컬 개발용 MySQL 컨테이너 정의
+├── docs/
+│   └── FRONTEND_INTEGRATION.md           # 프론트엔드 API 연동 가이드
 ├── src
 │   ├── main
 │   │   ├── java/com/example/backend/
+│   │   │   ├── arrival/                   # 서울시 TOPIS 도착정보 연동
 │   │   │   ├── config/                    # CORS, OpenAPI, 애플리케이션 설정
+│   │   │   ├── controller/                # 헬스 체크
+│   │   │   ├── demo/                      # demo 프로필 초기 데이터
 │   │   │   ├── domain/                    # 정류장·노선·경유 Entity
 │   │   │   ├── error/                     # 공통 API 오류 응답
 │   │   │   ├── masterdata/                # 기반정보 DAT 적재 배치
+│   │   │   ├── prediction/                # 여정 예측 API (현재 테스트 데이터)
+│   │   │   ├── repository/                # Spring Data JPA 리포지토리
 │   │   │   ├── stop/                      # 정류장 context/search API
 │   │   │   └── BackendApplication.java   # 메인 클래스
 │   │   └── resources/
 │   │       ├── application.yaml          # 공통 설정
-│   │       ├── application-local.yaml    # 로컬 프로필
+│   │       ├── application-local.yaml    # 로컬 프로필 (기본값)
+│   │       ├── application-demo.yaml     # FE 연결용 demo 프로필 (메모리 H2)
+│   │       ├── application-h2.yaml       # H2 파일 스모크 프로필
 │   │       └── application-prod.yaml     # 운영 프로필
 │   └── test
 │       └── java/com/example/backend/
@@ -76,8 +86,24 @@ backend/
 
 ## 설정 파일
 
-- **[application.yaml](src/main/resources/application.yaml)** — 앱 설정. 로컬 개발에서는 Docker Compose Support가 DB 접속 정보를 자동 주입하므로 datasource 설정이 없는 것이 정상입니다. 운영 환경 배포 시에는 프로필(`application-prod.yml`)이나 환경 변수로 실제 DB 접속 정보를 주입합니다.
+- **[application.yaml](src/main/resources/application.yaml)** — 공통 설정. 활성 프로필을 지정하지 않으면 `local`이 적용됩니다. 로컬 개발에서는 Docker Compose Support가 DB 접속 정보를 자동 주입하므로 datasource 설정이 없는 것이 정상입니다. 운영 환경 배포 시에는 프로필(`application-prod.yaml`)이나 환경 변수로 실제 DB 접속 정보를 주입합니다.
 - **[compose.yaml](compose.yaml)** — 로컬 개발 전용 MySQL 8.4 정의. 여기 적힌 계정 정보는 로컬 컨테이너에서만 쓰이는 값입니다. 데이터는 `mysql-data` 볼륨에 보존됩니다. 호스트 포트는 동적으로 할당되므로, DB 클라이언트(DBeaver 등)로 직접 접속하려면 `docker ps`로 매핑된 포트를 확인하거나 포트를 `"3306:3306"`으로 고정하면 됩니다.
+
+### 애플리케이션 설정값
+
+`app` 프리픽스로 묶여 있으며 [AppProperties](src/main/java/com/example/backend/config/AppProperties.java)에 정의돼 있습니다.
+
+| 설정 | 기본값 | 설명 |
+|---|---|---|
+| `app.api.initial-destination-stop-ids` | `107000089`, `100000147` | `/stops/{stopId}/context`가 초기 도착 정류장으로 내려줄 ID 목록 |
+| `app.master-data.import-enabled` | `false` | 기반정보 적재 실행 여부 |
+| `app.master-data.city-name` | `서울특별시` | 적재 대상 시도 |
+| `app.master-data.stop-file` / `route-file` / `route-stop-file` | 환경 변수 | 적재할 DAT 경로 |
+| `app.topis.enabled` | `true` | TOPIS 연동 사용 여부 |
+| `app.topis.base-url` | `http://ws.bus.go.kr/api/rest` | TOPIS 엔드포인트 |
+| `app.topis.connect-timeout` / `request-timeout` | `3s` / `5s` | 연결·응답 제한시간 |
+| `app.topis.cache-ttl` | `20s` | 도착정보 캐시 유지시간 |
+| `app.demo.enabled` | `false` | demo 초기 데이터 적재 여부 (`demo` 프로필에서 `true`) |
 
 운영 프로필은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경 변수를 사용합니다.
 
@@ -102,7 +128,30 @@ H2 프로필의 데이터 파일은 `.local/backend-smoke.mv.db`에 생성되며
 | `GET` | `/api/v1/stops/search?originStopId=&query=` | 정류장명·ARS·노선번호 검색 및 직통 노선 조회 |
 | `POST` | `/api/v1/journeys/predictions` | FE 계약 검증용 직통 여정 테스트 데이터 조회 |
 
+`stopId`, `originStopId`, `destinationStopId`는 숫자 9자리, `query`는 1~50자입니다. 검색 결과가 없으면 `200`과 함께 `destinationStops`가 빈 배열로 반환됩니다. 직통 노선이 없는 정류장도 검색 결과에서 숨기지 않고 `servedRoutes: []`로 내려주며, 그 정류장으로 여정 예측을 요청했을 때 `404 NO_DIRECT_ROUTE`가 반환됩니다.
+
 Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다. API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
+
+프론트 연결 절차, 실제 JSON 예시, Mock 계약 대비 변경 사항은 [프론트엔드 연동 가이드](docs/FRONTEND_INTEGRATION.md)를 참고하세요.
+
+| HTTP status | `code` | 사용 상황 |
+|---|---|---|
+| `400` | `INVALID_REQUEST` | 필수값 누락, 잘못된 ID 형식 |
+| `404` | `STOP_NOT_FOUND` | 출발 또는 도착 정류장 없음 |
+| `404` | `NO_DIRECT_ROUTE` | 두 정류장을 한 번에 잇는 버스 없음 |
+| `409` | `STOP_DIRECTION_MISMATCH` | 정류장은 있지만 선택 방향으로 이동 불가 |
+| `500` | `INTERNAL_SERVER_ERROR` | 서버 처리 실패 |
+
+혼잡도 데이터 부족은 오류가 아니라 `200` 응답의 `status: "INSUFFICIENT_DATA"`로 구분합니다.
+
+### CORS
+
+[CorsConfig](src/main/java/com/example/backend/config/CorsConfig.java)에서 `/api/**` 경로에 아래 Origin의 `GET`, `POST`, `OPTIONS` 요청을 허용합니다. 허용 헤더는 `Accept`, `Content-Type`입니다.
+
+- `http://localhost:5173`
+- `https://kd-dinjae-2026-fe.vercel.app`
+
+정식 Vercel 주소는 등록되어 있지만 Preview URL은 허용되지 않습니다. Preview 또는 추가 배포 도메인을 사용하면 이 목록도 함께 갱신해야 합니다.
 
 ### FE 연결용 demo 프로필
 
@@ -116,7 +165,7 @@ AI·TOPIS 연동 방식이 확정되기 전에도 FE가 실제 HTTP 연결을 �
 
 | 시나리오 | 출발 정류장 | 도착 정류장 | 결과 |
 |---|---|---|---|
-| 테스트 성공 | `107000087` | `107000089` | `SUCCESS`, 1014·152·103·142번 테스트 여정 |
+| 테스트 성공 | `107000087` | `107000089` | `SUCCESS`, 1014·103·142·152번 테스트 여정 |
 | 테스트 데이터 부족 | `107000087` | `100000147` | `INSUFFICIENT_DATA`, 도착·이동시간만 제공 |
 | 직통 없음 | `107000087` | `121009999` | `404 NO_DIRECT_ROUTE` |
 
@@ -134,6 +183,8 @@ SEOUL_BUS_API_ENABLED=true
 ```
 
 연결 제한시간은 3초, 응답 제한시간은 5초입니다. 운영 환경에서는 동일한 이름의 환경 변수나 비밀 관리 서비스로 주입합니다. 연동을 일시적으로 끄려면 `SEOUL_BUS_API_ENABLED=false`를 사용합니다.
+
+현재 인증키 발급과 API 활용 신청은 완료됐지만 공공데이터포털에서 `SERVICE KEY IS NOT REGISTERED` 응답이 계속되어 실호출 검증은 대기 중입니다. 현재 여정 API는 TOPIS를 호출하지 않고 테스트 데이터를 반환합니다.
 
 ## 기반정보 적재
 
@@ -158,9 +209,23 @@ Docker/MySQL 없이 H2 스모크 DB에 적재할 때는 마지막 명령에 H2 �
 
 ## 여정 테스트 데이터
 
-AI 연동 방식은 회의 후 결정할 예정이므로 현재 여정 API는 예측 테이블, 외부 날씨 API, AI 배치 파일을 사용하지 않습니다. 요청한 출발·도착 정류장 사이의 직통 노선을 기반으로 FE 계약 검증용 도착시간·이동시간·입석 부담 데이터를 반환합니다.
+현재 여정 API는 예측 테이블, 외부 날씨 API, AI 배치 파일을 사용하지 않습니다. 요청한 출발·도착 정류장 사이의 직통 노선을 기반으로 FE 계약 검증용 도착시간·이동시간·입석 부담 데이터를 반환합니다.
 
-프론트 Mock의 `107000089` 목적지는 `SUCCESS`, `100000147` 목적지는 `INSUFFICIENT_DATA` 시나리오로 고정되어 있습니다. 그 밖의 직통 구간도 테스트 값으로 응답하며, 실제 운행 또는 AI 예측 결과로 사용하면 안 됩니다. AI 입력·출력과 호출 주기가 확정되면 이 테스트 서비스만 실제 연동 구현으로 교체합니다.
+프론트 Mock의 `107000089` 목적지는 `SUCCESS`, `100000147` 목적지는 `INSUFFICIENT_DATA` 시나리오로 고정되어 있습니다. 그 밖의 직통 구간도 테스트 값으로 응답하며, 실제 운행 또는 AI 예측 결과로 사용하면 안 됩니다.
+
+### 실제 예측 연동 계획
+
+AI 입력·출력과 백엔드 연동 방식은 회의 후 확정합니다. 현재 코드에는 예측 테이블, AI CSV 적재, 외부 날씨 조회가 없으며 `JourneyTestDataService`가 테스트 응답을 담당합니다.
+
+회의에서 다음 항목을 결정한 뒤 실제 연동을 구현합니다.
+
+- 실시간 API 호출 또는 배치 사전계산 여부
+- 노선·승하차 정류장·요일·시각·날씨 등 조회 키와 예측 단위
+- 입석 부담 단계와 `INSUFFICIENT_DATA`, `confidence` 판정 기준
+- 예측 결과 전달 형식과 갱신 주기
+- 지원 지역·기간과 실제 데모 정류장
+
+현재 확보한 학습 데이터 범위는 **서초구 2025년 4월**분이지만, 실제 지원 범위와 데모 구간은 아직 확정되지 않았습니다. 위 demo 프로필의 성북구 정류장은 FE 계약 검증 전용입니다.
 
 ## 컨벤션 메모
 
