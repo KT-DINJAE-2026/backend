@@ -1,6 +1,6 @@
 # 프론트엔드 연동 가이드
 
-백엔드 API 사용법과 `API_CONTRACT_DRAFT.md` v0.6 대비 변경 사항을 정리한 문서입니다.
+백엔드 API 사용법과 기존 FE Mock JSON 대비 변경 사항을 정리한 문서입니다.
 
 - 기준일: 2026-08-03
 - 기본 경로: `/api/v1`
@@ -25,7 +25,7 @@ if (!response.ok) {
 }
 ```
 
-백엔드는 계약서 12장대로 **직통 노선이 없을 때 `404 NO_DIRECT_ROUTE`** 를 반환합니다. 지금 코드로는 `code`를 읽을 수 없어 "직통 버스 없음" 화면 대신 "서버 오류" 화면이 뜹니다. Figma의 `04-C-no-direct-route` 화면에 도달하려면 이 수정이 필요합니다.
+백엔드는 **직통 노선이 없을 때 `404 NO_DIRECT_ROUTE`** 를 반환합니다. 지금 코드로는 `code`를 읽을 수 없어 "직통 버스 없음" 화면 대신 "서버 오류" 화면이 뜹니다. Figma의 `04-C-no-direct-route` 화면에 도달하려면 이 수정이 필요합니다.
 
 ```js
 if (!response.ok) {
@@ -216,7 +216,7 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 
 한글 검색어는 **UTF-8 퍼센트 인코딩**으로 보내야 합니다. `encodeURIComponent()`를 쓰면 됩니다.
 
-계약서 6장대로, 직통 노선이 없는 정류장도 검색 결과에서 숨기지 않고 `servedRoutes: []`로 반환합니다. 그 정류장으로 여정 분석을 요청하면 `404 NO_DIRECT_ROUTE`가 옵니다.
+검색 API는 직통 노선이 없는 정류장도 결과에서 숨기지 않고 `servedRoutes: []`로 반환합니다. 그 정류장으로 여정 분석을 요청하면 `404 NO_DIRECT_ROUTE`가 옵니다.
 
 ### 3.3 여정 분석 — `POST /api/v1/journeys/predictions`
 
@@ -286,7 +286,7 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 }
 ```
 
-계약서 10장의 검증 규칙은 서버가 지킵니다. 구간 순서·연속성, 구간 시간 합계 = `travelMinutes`, `RELAXED` 제외 구간 합계 = `standingBurdenMinutes`, 한 응답 내 `tripId` 유일성이 보장됩니다.
+서버는 구간 순서·연속성, 구간 시간 합계 = `travelMinutes`, `RELAXED` 제외 구간 합계 = `standingBurdenMinutes`, 한 응답 내 `tripId` 유일성을 지킵니다.
 
 #### 혼잡도 데이터 부족
 
@@ -315,7 +315,7 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 }
 ```
 
-`standingBurdenMinutes`, `standingBurdenLevel`, `segments`는 `null`이 아니라 **필드 자체가 빠집니다.** 계약서 3장의 "선택 값이 없을 때는 `null`보다 필드 생략" 규칙 그대로입니다.
+`standingBurdenMinutes`, `standingBurdenLevel`, `segments`는 `null`이 아니라 **필드 자체가 빠집니다.** 현재 API는 선택 값이 없을 때 `null` 대신 필드를 생략합니다.
 
 #### 오류
 
@@ -335,23 +335,27 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 
 ---
 
-## 4. 계약서 v0.6 대비 변경 사항
+## 4. 기존 FE Mock 응답 대비 변경 사항
 
-### 4.1 응답에서 빠진 필드 — FE가 생성해야 합니다
+### 4.1 백엔드 제공 데이터와 화면 표시 책임
 
-역할 협의에 따라 **백엔드는 enum과 수치만 주고 표시 문구는 FE가 결정**하기로 정했습니다. 문구를 고칠 때마다 백엔드를 재배포하지 않아도 되는 이점도 있습니다.
+현재 백엔드는 정류장·노선의 식별값과 원본명, 방향, 좌표, 도착·이동시간, 상태 enum 등 **서비스 판단에 필요한 값**을 제공합니다. FE는 이 값을 화면에 어떻게 표현할지 결정합니다.
 
-| 빠진 필드 | 대체 방법 |
-|---|---|
-| `displayName` | `stopName`을 그대로 쓰거나 FE에서 가공 |
-| `landmark` | 동명 정류장 구분은 `arsId` + `directionDescription` + `location`으로 |
-| `searchKeywords` | 서버 검색을 쓰므로 불필요 |
-| `roadviewFallback` | FE 자체 자산으로 관리 |
-| `summaryMessage` | `standingBurdenLevel` enum으로 생성 |
-| `segments[].description` | `congestionLevel` enum으로 생성 |
-| `predictionBasis.description` | `confidence` enum으로 생성 |
-| `fromStopDisplayName` / `toStopDisplayName` | `fromStopName` / `toStopName` 사용 |
-| `dataSource` | 운영 응답에서는 제공하지 않음 |
+이 구분은 기술적으로 반드시 정해진 규칙은 아닙니다. 현재 API에서는 자주 바뀌는 UI 문구를 FE가 관리하도록 구현한 것입니다. 실제 데이터가 필요한 필드는 FE가 임의로 만들지 않습니다.
+
+| 기존 Mock 필드 | 현재 처리 방법 | 담당 |
+|---|---|---|
+| `displayName` | `stopName`을 그대로 사용하거나 화면용으로 가공 | FE |
+| `landmark` | 현재 기획 범위에서 제외. 추후 실제 주변 장소 데이터가 필요하면 백엔드 데이터로 추가 | 현재 미사용 |
+| `searchKeywords` | 제거. `/api/v1/stops/search`에서 정류장명·ARS·노선 번호 검색 | BE |
+| `roadviewFallback` | 현재 API에서 제외. 대체 이미지가 필요하면 FE 자산으로 관리 | FE 선택 |
+| `summaryMessage` | `standingBurdenLevel`, 도착·이동시간을 조합해 화면 문구 생성 | FE |
+| `segments[].description` | `congestionLevel`에 대응하는 화면 문구 생성 | FE |
+| `predictionBasis.description` | 현재는 `confidence` 라벨만 FE에서 생성. 실제 기준 시각·요일·날씨 등 근거가 필요하면 백엔드가 구조화된 값으로 추가 | FE 표시 / BE 사실값 |
+| `fromStopDisplayName` / `toStopDisplayName` | `fromStopName` / `toStopName`을 사용하거나 화면용으로 가공 | FE |
+| `dataSource` | 현재 API에서 제외. 추후 출처 메타데이터가 필요하면 백엔드 응답으로 추가 | 현재 미사용 |
+
+예를 들어 백엔드는 `standingBurdenLevel: "HIGH"`, `congestionLevel: "RELAXED"`처럼 의미가 고정된 값을 보냅니다. FE는 이를 각각 `입석 부담 높음`, `여유`처럼 화면에 표시합니다. 반면 `평일 오후 2시 자료 기준`처럼 실제 예측 근거를 설명하는 정보는 FE가 만들지 않고 향후 백엔드가 제공해야 합니다. 문구를 백엔드에서 통합 관리하기로 다시 결정한다면 API에 표시 문구 필드를 추가할 수도 있습니다.
 
 `predictionBasis`는 `confidence` 하나만 있는 객체입니다.
 
@@ -361,20 +365,20 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 
 ### 4.2 `routeNumber`에 "번"이 붙지 않습니다
 
-계약서에 표기가 섞여 있었습니다(3장 표는 `1014번`, `bootstrap.json`은 `1014`). **서버는 모든 응답에서 "번" 없이 `"1014"`로 통일**합니다. 화면 표시용 "번"은 FE에서 붙여주세요.
+기존 Mock과 API 초안에 `1014번`, `1014` 표기가 섞여 있었습니다. **서버는 모든 응답에서 "번" 없이 `"1014"`로 통일**합니다. 화면 표시용 "번"은 FE에서 붙여주세요.
 
 ### 4.3 `NO_DIRECT_ROUTE`는 `404`입니다
 
-계약서 6장(200 + `servedRoutes: []`)과 12장(404)이 충돌했는데, **12장 기준으로 확정**했습니다. 두 규정은 대상이 달라 실제로는 충돌하지 않습니다.
+기존 초안에는 `200 + servedRoutes: []`와 `404 NO_DIRECT_ROUTE`가 함께 있어 혼동될 수 있었습니다. 두 응답은 대상 요청이 다릅니다.
 
 - **검색 API**: 직통이 없어도 정류장을 숨기지 않고 `200` + `servedRoutes: []`
 - **여정 분석 API**: 그 정류장으로 요청하면 `404 NO_DIRECT_ROUTE`
 
-1장의 `busApi.js` 수정이 필요한 이유입니다.
+이 차이를 화면에서 구분하려면 1장의 `busApi.js` 수정이 필요합니다.
 
 ### 4.4 좌표 정밀도가 소수점 8자리입니다
 
-계약서 예시는 10자리(`37.5858514183`)였으나 서버는 8자리(`37.58585142`)로 반환합니다. 약 1mm 차이라 카카오 로드뷰 조회에는 영향이 없습니다.
+기존 Mock은 소수점 10자리(`37.5858514183`)였으나 서버는 8자리(`37.58585142`)로 반환합니다. 약 1mm 차이라 카카오 로드뷰 조회에는 영향이 없습니다.
 
 ### 4.5 `generatedAt`에 나노초가 포함됩니다
 
@@ -386,7 +390,7 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 
 ### 4.7 `currentStop`에도 `directionDescription`이 있습니다
 
-계약서와 동일하지만, 값은 노선 종점명 기반으로 `"동묘앞 방면"` 형태로 생성됩니다.
+기존 Mock과 마찬가지로 `currentStop`에도 이 필드가 있으며, 값은 노선 종점명 기반으로 `"동묘앞 방면"` 형태로 생성됩니다.
 
 ---
 
