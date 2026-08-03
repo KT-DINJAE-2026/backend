@@ -1,3 +1,27 @@
 spring:
   application:
     name: backend
+  profiles:
+    default: local
+
+app:
+  api:
+    initial-destination-stop-ids:
+      - "121000021"
+      - "121001344"
+  master-data:
+    import-enabled: false
+    city-name: "서울특별시"
+    stop-file: ${MASTER_STOP_FILE:}
+    route-file: ${MASTER_ROUTE_FILE:}
+    route-stop-file: ${MASTER_ROUTE_STOP_FILE:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      force-response: true

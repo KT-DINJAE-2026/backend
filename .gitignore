@@ -40,15 +40,22 @@ bin/
 *.log
 logs/
 
+### 데이터 파이프라인 산출물 ###
+data-pipeline/output/
+data-pipeline/cache/
+data-pipeline/__pycache__/
+
 ### JVM 크래시 로그 ###
 hs_err_pid*
 replay_pid*
 
 ### 로컬 환경 변수 / 시크릿 ###
 .env
+.local/
 # 개인 로컬 오버라이드용 프로필 (팀 공유 설정은 application.yaml에)
 application-local*.yml
 application-local*.yaml
+!src/main/resources/application-local.yaml
 
 ### macOS ###
 .DS_Store

@@ -1,0 +1,58 @@
+package com.example.backend.error;
+
+import java.util.UUID;
+
+import jakarta.validation.ConstraintViolationException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+	private static final MediaType JSON_UTF8 = MediaType.parseMediaType("application/json;charset=UTF-8");
+
+	@ExceptionHandler(ApiException.class)
+	public ResponseEntity<ApiErrorResponse> handleApiException(ApiException exception) {
+		return response(exception.errorCode(), exception);
+	}
+
+	@ExceptionHandler({
+			ConstraintViolationException.class,
+			MethodArgumentNotValidException.class,
+			MissingServletRequestParameterException.class,
+			HttpMessageNotReadableException.class
+	})
+	public ResponseEntity<ApiErrorResponse> handleInvalidRequest(Exception exception) {
+		return response(ErrorCode.INVALID_REQUEST, exception);
+	}
+
+	@ExceptionHandler(Exception.class)
+	public ResponseEntity<ApiErrorResponse> handleUnexpectedException(Exception exception) {
+		return response(ErrorCode.INTERNAL_SERVER_ERROR, exception);
+	}
+
+	private ResponseEntity<ApiErrorResponse> response(ErrorCode errorCode, Exception exception) {
+		String traceId = UUID.randomUUID().toString().substring(0, 8);
+		if (errorCode.status().is5xxServerError()) {
+			log.error("traceId={} code={}", traceId, errorCode.name(), exception);
+		} else {
+			log.warn("traceId={} code={} message={}", traceId, errorCode.name(), exception.getMessage());
+		}
+		return ResponseEntity.status(errorCode.status())
+				.contentType(JSON_UTF8)
+				.body(new ApiErrorResponse(
+						errorCode.name(),
+						errorCode.message(),
+						traceId
+				));
+	}
+}
