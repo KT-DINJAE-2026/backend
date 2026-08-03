@@ -1,16 +1,11 @@
 package com.example.backend.demo;
 
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.DayOfWeek;
-import java.time.OffsetDateTime;
 import java.util.List;
 
-import com.example.backend.domain.PredictionEntity;
 import com.example.backend.domain.RouteEntity;
 import com.example.backend.domain.RouteStopEntity;
 import com.example.backend.domain.StopEntity;
-import com.example.backend.repository.PredictionRepository;
 import com.example.backend.repository.RouteRepository;
 import com.example.backend.repository.RouteStopRepository;
 import com.example.backend.repository.StopRepository;
@@ -28,69 +23,54 @@ public class DemoDataInitializer implements ApplicationRunner {
 	private final StopRepository stopRepository;
 	private final RouteRepository routeRepository;
 	private final RouteStopRepository routeStopRepository;
-	private final PredictionRepository predictionRepository;
-	private final Clock clock;
 
 	public DemoDataInitializer(
 			StopRepository stopRepository,
 			RouteRepository routeRepository,
-			RouteStopRepository routeStopRepository,
-			PredictionRepository predictionRepository,
-			Clock clock
+			RouteStopRepository routeStopRepository
 	) {
 		this.stopRepository = stopRepository;
 		this.routeRepository = routeRepository;
 		this.routeStopRepository = routeStopRepository;
-		this.predictionRepository = predictionRepository;
-		this.clock = clock;
 	}
 
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		StopEntity origin = saveStop("121000019", "22019", "고속터미널", "37.506300", "127.005140");
-		StopEntity middle = saveStop("121000020", "22020", "고속터미널", "37.505160", "127.001050");
-		StopEntity success = saveStop(
-				"121000021", "22021", "신반포역.세화여중고", "37.503420", "126.995720"
+		StopEntity origin = saveStop(
+				"107000087", "08177", "성북구청.성북경찰서", "37.5881513802", "127.0174306588"
 		);
-		StopEntity insufficientMiddle = saveStop(
-				"121001343", "22045", "양재시민의숲", "37.476200", "127.038200"
+		StopEntity success = saveStop(
+				"107000089", "08179", "보문역2번출구", "37.5858514183", "127.0189209428"
+		);
+		StopEntity middle = saveStop(
+				"100000146", "01242", "동묘앞역", "37.5731800000", "127.0165500000"
 		);
 		StopEntity insufficient = saveStop(
-				"121001344", "22046", "매헌시민의숲", "37.470360", "127.038750"
+				"100000147", "01243", "신설동역오거리", "37.5756947252", "127.0228414296"
 		);
-		saveStop("121009999", "22999", "양재역", "37.484580", "127.034140");
+		saveStop("121009999", "22999", "직통노선없는정류장", "37.584580", "127.034140");
 
-		RouteEntity route148 = saveRoute("100100027", "148", "방배동", "번동", "115");
-		RouteEntity route360 = saveRoute("100100057", "360", "송파", "여의도", "115");
-		RouteEntity route452 = saveRoute("113000002", "452", "송파", "매헌시민의숲", "120");
+		RouteEntity route1014 = saveRoute("100100129", "1014", "성북구청", "동묘앞", "115");
+		RouteEntity route152 = saveRoute("100100031", "152", "성북구청", "동대문", "115");
+		RouteEntity route103 = saveRoute("100100008", "103", "성북구청", "동대문", "115");
+		RouteEntity route142 = saveRoute("100100021", "142", "성북구청", "창신동", "115");
 
 		routeStopRepository.saveAll(List.of(
-				new RouteStopEntity(route148, origin, 35, 300),
-				new RouteStopEntity(route148, middle, 36, 700),
-				new RouteStopEntity(route148, success, 37, 200),
-				new RouteStopEntity(route360, origin, 27, 500),
-				new RouteStopEntity(route360, success, 28, 300),
-				new RouteStopEntity(route452, origin, 56, 8_000),
-				new RouteStopEntity(route452, insufficientMiddle, 57, 2_000),
-				new RouteStopEntity(route452, insufficient, 58, 500)
-		));
-
-		OffsetDateTime now = OffsetDateTime.now(clock);
-		String weekday = koreanWeekday(now.getDayOfWeek());
-		predictionRepository.saveAll(List.of(
-				new PredictionEntity(
-						route148, origin, success, weekday, now.getHour(), "맑음", "04",
-						150, "MEDIUM", new BigDecimal("0.8120"), 150, 50, 600, "demo"
-				),
-				new PredictionEntity(
-						route360, origin, success, weekday, now.getHour(), "맑음", "04",
-						0, "LOW", new BigDecimal("0.9300"), 1_200, 300, 540, "demo"
-				),
-				new PredictionEntity(
-						route452, origin, insufficient, weekday, now.getHour(), "맑음", "04",
-						null, null, null, 1, 1, 1_200, "demo"
-				)
+				new RouteStopEntity(route1014, origin, 10, 300),
+				new RouteStopEntity(route1014, success, 11, 500),
+				new RouteStopEntity(route1014, middle, 12, 600),
+				new RouteStopEntity(route1014, insufficient, 13, 400),
+				new RouteStopEntity(route152, origin, 20, 300),
+				new RouteStopEntity(route152, success, 21, 500),
+				new RouteStopEntity(route152, middle, 22, 600),
+				new RouteStopEntity(route152, insufficient, 23, 400),
+				new RouteStopEntity(route103, origin, 30, 300),
+				new RouteStopEntity(route103, success, 31, 500),
+				new RouteStopEntity(route103, middle, 32, 600),
+				new RouteStopEntity(route103, insufficient, 33, 400),
+				new RouteStopEntity(route142, origin, 40, 300),
+				new RouteStopEntity(route142, success, 41, 500)
 		));
 	}
 
@@ -126,15 +106,4 @@ public class DemoDataInitializer implements ApplicationRunner {
 		));
 	}
 
-	private static String koreanWeekday(DayOfWeek dayOfWeek) {
-		return switch (dayOfWeek) {
-			case MONDAY -> "월";
-			case TUESDAY -> "화";
-			case WEDNESDAY -> "수";
-			case THURSDAY -> "목";
-			case FRIDAY -> "금";
-			case SATURDAY -> "토";
-			case SUNDAY -> "일";
-		};
-	}
 }

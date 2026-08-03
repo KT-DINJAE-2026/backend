@@ -12,7 +12,6 @@ public class AppProperties {
 	private final Api api = new Api();
 	private final MasterData masterData = new MasterData();
 	private final Topis topis = new Topis();
-	private final Prediction prediction = new Prediction();
 	private final Demo demo = new Demo();
 
 	public Api getApi() {
@@ -25,10 +24,6 @@ public class AppProperties {
 
 	public Topis getTopis() {
 		return topis;
-	}
-
-	public Prediction getPrediction() {
-		return prediction;
 	}
 
 	public Demo getDemo() {
@@ -152,137 +147,6 @@ public class AppProperties {
 
 		public void setCacheTtl(Duration cacheTtl) {
 			this.cacheTtl = cacheTtl;
-		}
-	}
-
-	public static class Prediction {
-
-		public enum SampleBasis {
-			BOARDING_STOP,
-			OD_PAIR
-		}
-
-		public enum UserTypeMode {
-			FIXED,
-			SELECT
-		}
-
-		private SampleBasis sampleBasis = SampleBasis.BOARDING_STOP;
-		private UserTypeMode userTypeMode = UserTypeMode.FIXED;
-		private String fixedUserTypeCode = "04";
-		private String defaultWeather = "맑음";
-		private boolean importEnabled;
-		private String importFile = "";
-		private boolean weatherEnabled = true;
-		private String weatherBaseUrl = "https://api.open-meteo.com/v1/forecast";
-		private Duration weatherRequestTimeout = Duration.ofSeconds(5);
-		private Duration weatherCacheTtl = Duration.ofMinutes(15);
-		private int minSampleCount = 30;
-		private int mediumConfidenceSampleCount = 100;
-		private int highConfidenceSampleCount = 1000;
-
-		public SampleBasis getSampleBasis() {
-			return sampleBasis;
-		}
-
-		public void setSampleBasis(SampleBasis sampleBasis) {
-			this.sampleBasis = sampleBasis;
-		}
-
-		public UserTypeMode getUserTypeMode() {
-			return userTypeMode;
-		}
-
-		public void setUserTypeMode(UserTypeMode userTypeMode) {
-			this.userTypeMode = userTypeMode;
-		}
-
-		public String getFixedUserTypeCode() {
-			return fixedUserTypeCode;
-		}
-
-		public void setFixedUserTypeCode(String fixedUserTypeCode) {
-			this.fixedUserTypeCode = fixedUserTypeCode;
-		}
-
-		public String getDefaultWeather() {
-			return defaultWeather;
-		}
-
-		public void setDefaultWeather(String defaultWeather) {
-			this.defaultWeather = defaultWeather;
-		}
-
-		public boolean isImportEnabled() {
-			return importEnabled;
-		}
-
-		public void setImportEnabled(boolean importEnabled) {
-			this.importEnabled = importEnabled;
-		}
-
-		public String getImportFile() {
-			return importFile;
-		}
-
-		public void setImportFile(String importFile) {
-			this.importFile = importFile;
-		}
-
-		public boolean isWeatherEnabled() {
-			return weatherEnabled;
-		}
-
-		public void setWeatherEnabled(boolean weatherEnabled) {
-			this.weatherEnabled = weatherEnabled;
-		}
-
-		public String getWeatherBaseUrl() {
-			return weatherBaseUrl;
-		}
-
-		public void setWeatherBaseUrl(String weatherBaseUrl) {
-			this.weatherBaseUrl = weatherBaseUrl;
-		}
-
-		public Duration getWeatherRequestTimeout() {
-			return weatherRequestTimeout;
-		}
-
-		public void setWeatherRequestTimeout(Duration weatherRequestTimeout) {
-			this.weatherRequestTimeout = weatherRequestTimeout;
-		}
-
-		public Duration getWeatherCacheTtl() {
-			return weatherCacheTtl;
-		}
-
-		public void setWeatherCacheTtl(Duration weatherCacheTtl) {
-			this.weatherCacheTtl = weatherCacheTtl;
-		}
-
-		public int getMinSampleCount() {
-			return minSampleCount;
-		}
-
-		public void setMinSampleCount(int minSampleCount) {
-			this.minSampleCount = minSampleCount;
-		}
-
-		public int getMediumConfidenceSampleCount() {
-			return mediumConfidenceSampleCount;
-		}
-
-		public void setMediumConfidenceSampleCount(int mediumConfidenceSampleCount) {
-			this.mediumConfidenceSampleCount = mediumConfidenceSampleCount;
-		}
-
-		public int getHighConfidenceSampleCount() {
-			return highConfidenceSampleCount;
-		}
-
-		public void setHighConfidenceSampleCount(int highConfidenceSampleCount) {
-			this.highConfidenceSampleCount = highConfidenceSampleCount;
 		}
 	}
 

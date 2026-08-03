@@ -11,8 +11,8 @@ app:
     enabled: false
   api:
     initial-destination-stop-ids:
-      - "121000021"
-      - "121001344"
+      - "107000089"
+      - "100000147"
   master-data:
     import-enabled: false
     city-name: "서울특별시"
@@ -26,20 +26,6 @@ app:
     connect-timeout: 3s
     request-timeout: 5s
     cache-ttl: 20s
-  prediction:
-    import-enabled: false
-    import-file: ${PREDICTION_IMPORT_FILE:}
-    sample-basis: ${PREDICTION_SAMPLE_BASIS:BOARDING_STOP}
-    user-type-mode: ${PREDICTION_USER_TYPE_MODE:FIXED}
-    fixed-user-type-code: ${PREDICTION_USER_TYPE_CODE:04}
-    default-weather: ${PREDICTION_DEFAULT_WEATHER:맑음}
-    weather-enabled: ${WEATHER_API_ENABLED:true}
-    weather-base-url: ${WEATHER_API_BASE_URL:https://api.open-meteo.com/v1/forecast}
-    weather-request-timeout: 5s
-    weather-cache-ttl: 15m
-    min-sample-count: 30
-    medium-confidence-sample-count: 100
-    high-confidence-sample-count: 1000
 
 springdoc:
   swagger-ui:

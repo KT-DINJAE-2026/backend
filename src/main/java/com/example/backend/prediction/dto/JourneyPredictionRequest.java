@@ -9,8 +9,6 @@ public record JourneyPredictionRequest(
 		String originStopId,
 		@NotBlank
 		@Pattern(regexp = "\\d{9}", message = "destinationStopId는 숫자 9자리여야 합니다.")
-		String destinationStopId,
-		@Pattern(regexp = "01|02|04|05", message = "지원하지 않는 usertypeCode입니다.")
-		String usertypeCode
+		String destinationStopId
 ) {
 }

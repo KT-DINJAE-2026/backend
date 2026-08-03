@@ -23,52 +23,47 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(path = "/api/v1/journeys", produces = MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
 public class JourneyPredictionController {
 
-	private final JourneyPredictionService predictionService;
+	private final JourneyTestDataService testDataService;
 
-	public JourneyPredictionController(JourneyPredictionService predictionService) {
-		this.predictionService = predictionService;
+	public JourneyPredictionController(JourneyTestDataService testDataService) {
+		this.testDataService = testDataService;
 	}
 
-	@Operation(summary = "직통 버스 여정 예측")
+	@Operation(
+			summary = "직통 버스 여정 테스트 데이터 조회",
+			description = "AI 연동 방식 확정 전까지 FE 계약 검증용 고정 데이터를 반환합니다."
+	)
 	@ApiResponse(
 			responseCode = "200",
 			description = "예측 성공 또는 과거 표본 부족 응답",
 			content = @Content(
 					schema = @Schema(implementation = JourneyPredictionResponse.class),
-					examples = {
+						examples = {
 							@ExampleObject(name = "SUCCESS", value = """
 									{
 									  "status":"SUCCESS",
 									  "generatedAt":"2026-08-03T09:00:00+09:00",
-									  "originStopId":"121000019",
-									  "destinationStopId":"121000021",
+									  "originStopId":"107000087",
+									  "destinationStopId":"107000089",
 									  "predictionBasis":{"confidence":"MEDIUM"},
 									  "routes":[{
-									    "tripId":"demo-148-low",
-									    "routeId":"100100027",
-									    "routeNumber":"148",
-									    "direction":"서초구 방면",
+									    "tripId":"mock-trip-100100129-1405",
+									    "routeId":"100100129",
+									    "routeNumber":"1014",
+									    "direction":"동묘앞 방면",
 									    "vehicleType":"저상버스",
 									    "isLowFloor":true,
-									    "arrivalMinutes":2,
-									    "travelMinutes":10,
-									    "standingBurdenMinutes":3,
-									    "standingBurdenLevel":"MEDIUM",
+									    "arrivalMinutes":5,
+									    "travelMinutes":3,
+									    "standingBurdenMinutes":0,
+									    "standingBurdenLevel":"LOW",
 									    "segments":[
 									      {
-									        "fromStopId":"121000019",
-									        "fromStopName":"고속터미널",
-									        "toStopId":"121000020",
-									        "toStopName":"고속터미널",
+									        "fromStopId":"107000087",
+									        "fromStopName":"성북구청.성북경찰서",
+									        "toStopId":"107000089",
+									        "toStopName":"보문역2번출구",
 									        "durationMinutes":3,
-									        "congestionLevel":"CROWDED"
-									      },
-									      {
-									        "fromStopId":"121000020",
-									        "fromStopName":"고속터미널",
-									        "toStopId":"121000021",
-									        "toStopName":"신반포역.세화여중고",
-									        "durationMinutes":7,
 									        "congestionLevel":"RELAXED"
 									      }
 									    ]
@@ -80,18 +75,18 @@ public class JourneyPredictionController {
 									  "status":"INSUFFICIENT_DATA",
 									  "reasonCode":"NOT_ENOUGH_HISTORICAL_SAMPLES",
 									  "generatedAt":"2026-08-03T09:00:00+09:00",
-									  "originStopId":"121000019",
-									  "destinationStopId":"121001344",
+									  "originStopId":"107000087",
+									  "destinationStopId":"100000147",
 									  "predictionBasis":{"confidence":"UNAVAILABLE"},
 									  "routes":[{
-									    "tripId":"demo-452-low",
-									    "routeId":"113000002",
-									    "routeNumber":"452",
-									    "direction":"서초구 방면",
+									    "tripId":"mock-trip-100100129-1404",
+									    "routeId":"100100129",
+									    "routeNumber":"1014",
+									    "direction":"동묘앞 방면",
 									    "vehicleType":"저상버스",
 									    "isLowFloor":true,
-									    "arrivalMinutes":5,
-									    "travelMinutes":20
+									    "arrivalMinutes":4,
+									    "travelMinutes":10
 									  }]
 									}
 									""")
@@ -110,6 +105,6 @@ public class JourneyPredictionController {
 	)
 	@PostMapping(path = "/predictions", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public JourneyPredictionResponse predict(@Valid @RequestBody JourneyPredictionRequest request) {
-		return predictionService.predict(request);
+		return testDataService.create(request);
 	}
 }

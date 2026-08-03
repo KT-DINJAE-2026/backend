@@ -100,13 +100,13 @@ H2 프로필의 데이터 파일은 `.local/backend-smoke.mv.db`에 생성되며
 | `GET` | `/health` | 서버 상태 확인 |
 | `GET` | `/api/v1/stops/{stopId}/context` | QR 출발 정류장과 초기 도착 정류장 조회 |
 | `GET` | `/api/v1/stops/search?originStopId=&query=` | 정류장명·ARS·노선번호 검색 및 직통 노선 조회 |
-| `POST` | `/api/v1/journeys/predictions` | 실시간 도착 차량과 AI 배치 예측을 결합한 직통 여정 분석 |
+| `POST` | `/api/v1/journeys/predictions` | FE 계약 검증용 직통 여정 테스트 데이터 조회 |
 
 Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다. API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
 
 ### FE 연결용 demo 프로필
 
-AI 배치 결과와 TOPIS 인증 상태에 관계없이 FE가 실제 HTTP 연결을 검증할 수 있도록 격리된 `demo` 프로필을 제공합니다. 메모리 H2에 서초구 성공·데이터 부족·직통 없음 시나리오를 넣고, 고정된 도착 예정 차량을 반환합니다. 로컬 MySQL과 운영 설정에는 데이터를 기록하지 않습니다.
+AI·TOPIS 연동 방식이 확정되기 전에도 FE가 실제 HTTP 연결을 검증할 수 있도록 격리된 `demo` 프로필을 제공합니다. 메모리 H2에 프론트 Mock과 같은 성공·데이터 부족·직통 없음 시나리오를 넣고, 고정된 테스트 데이터를 반환합니다. 로컬 MySQL과 운영 설정에는 데이터를 기록하지 않습니다.
 
 ```powershell
 .\gradlew.bat bootRun --args='--spring.profiles.active=demo'
@@ -116,9 +116,9 @@ AI 배치 결과와 TOPIS 인증 상태에 관계없이 FE가 실제 HTTP 연결
 
 | 시나리오 | 출발 정류장 | 도착 정류장 | 결과 |
 |---|---|---|---|
-| 예측 성공 | `121000019` | `121000021` | `SUCCESS`, 148·360번 도착 차량과 구간 예측 |
-| 표본 부족 | `121000019` | `121001344` | `INSUFFICIENT_DATA`, 452번 도착·이동시간 |
-| 직통 없음 | `121000019` | `121009999` | `404 NO_DIRECT_ROUTE` |
+| 테스트 성공 | `107000087` | `107000089` | `SUCCESS`, 1014·152·103·142번 테스트 여정 |
+| 테스트 데이터 부족 | `107000087` | `100000147` | `INSUFFICIENT_DATA`, 도착·이동시간만 제공 |
+| 직통 없음 | `107000087` | `121009999` | `404 NO_DIRECT_ROUTE` |
 
 이 프로필의 값은 FE–BE 계약 확인 전용이며 AI 성능이나 실제 버스 운행 결과로 사용하지 않습니다. FE 서버 모드는 `VITE_API_MODE=server`, `VITE_API_BASE_URL=http://localhost:8080`을 사용합니다.
 
@@ -156,38 +156,11 @@ Docker/MySQL 없이 H2 스모크 DB에 적재할 때는 마지막 명령에 H2 �
 
 `route_stop.stop_order`로 출발 정류장보다 뒤에 있는 도착 정류장만 직통으로 판정합니다. 순환 노선에서 동일 정류장이 여러 번 등장해도 정방향 순서 쌍이 존재하면 직통으로 처리합니다.
 
-## 여정 예측 데이터
+## 여정 테스트 데이터
 
-`prediction` 테이블은 AI가 배치로 사전계산한 결과를 저장합니다. 조회 키는 `(route_id, board_stop_id, alight_stop_id, weekday, prediction_hour, weather, usertype_code)`이며, 모델 출력인 입석 시간·위험 단계와 승차 정류장/OD 기준 표본 수, TCD 기반 이동시간을 함께 보관합니다.
+AI 연동 방식은 회의 후 결정할 예정이므로 현재 여정 API는 예측 테이블, 외부 날씨 API, AI 배치 파일을 사용하지 않습니다. 요청한 출발·도착 정류장 사이의 직통 노선을 기반으로 FE 계약 검증용 도착시간·이동시간·입석 부담 데이터를 반환합니다.
 
-기본 설정은 경로 사용자 코드 `04`, 날씨 `맑음`, 승차 정류장 표본 기준입니다. AI 배치가 `prediction` 테이블에 현재 요일·시간·날씨 조합을 적재해야 실제 차량이 응답에 포함됩니다.
-
-```properties
-PREDICTION_SAMPLE_BASIS=BOARDING_STOP
-PREDICTION_USER_TYPE_MODE=FIXED
-PREDICTION_USER_TYPE_CODE=04
-PREDICTION_DEFAULT_WEATHER=맑음
-```
-
-AI 배치 산출물은 UTF-8 CSV이며 첫 줄에 아래 헤더를 정확히 사용합니다. 쉼표를 포함하는 값은 허용하지 않습니다.
-
-```csv
-route_id,board_stop_id,alight_stop_id,weekday,prediction_hour,weather,usertype_code,standing_seconds,risk_level,model_confidence,boarding_sample_count,od_sample_count,travel_seconds,model_version
-100100027,121000019,121000021,월,9,맑음,04,150,MEDIUM,0.8120,150,50,600,model-a
-```
-
-표본 부족 행은 `standing_seconds`, `risk_level`, `model_confidence`를 빈 값으로 둘 수 있습니다. 마스터 데이터를 먼저 적재한 뒤 다음처럼 실행하면 유니크 조회 키 기준으로 기존 행을 갱신합니다. 파일 전체가 한 트랜잭션으로 처리되므로 잘못된 행이 있으면 일부만 반영되지 않습니다.
-
-```powershell
-$env:PREDICTION_IMPORT_FILE='C:\data\prediction.csv'
-.\gradlew.bat bootRun --args='--app.prediction.import-enabled=true'
-```
-
-`PREDICTION_SAMPLE_BASIS`는 `BOARDING_STOP` 또는 `OD_PAIR`로 전환할 수 있습니다. 표본이 30건 미만이면 `INSUFFICIENT_DATA`, 30/100/1,000건을 기준으로 신뢰도를 `LOW`/`MEDIUM`/`HIGH`로 변환합니다. 성공 응답에서는 `standingSeconds`가 걸치는 정류장 구간 전체를 입석 구간으로 올림하고, 구간별 시간 합계와 입석 부담 시간 합계를 서버에서 일치시킵니다.
-
-현재 날씨는 Open-Meteo의 `current=weather_code`를 사용합니다. 출발 정류장 좌표를 학습 파이프라인과 동일한 0.1도 격자로 반올림하고, 결과를 15분 캐시합니다. WMO 코드는 `맑음`, `구름많음`, `흐림`, `안개`, `비`, `눈`, `뇌우`로 변환합니다. 호출 실패나 좌표 누락, 해당 날씨 조합 미적재 시 `PREDICTION_DEFAULT_WEATHER` 행으로 폴백합니다. 연동을 끄려면 `WEATHER_API_ENABLED=false`를 사용합니다.
-
-TOPIS 인증·제공기관 장애가 발생하면 예측 요청 전체를 500으로 바꾸지 않고 실시간 차량 목록만 비웁니다. 인증이 정상화되면 코드 변경 없이 동일한 엔드포인트에서 실제 `tripId`, 도착시간, 저상버스 여부가 결합됩니다.
+프론트 Mock의 `107000089` 목적지는 `SUCCESS`, `100000147` 목적지는 `INSUFFICIENT_DATA` 시나리오로 고정되어 있습니다. 그 밖의 직통 구간도 테스트 값으로 응답하며, 실제 운행 또는 AI 예측 결과로 사용하면 안 됩니다. AI 입력·출력과 호출 주기가 확정되면 이 테스트 서비스만 실제 연동 구현으로 교체합니다.
 
 ## 컨벤션 메모
 

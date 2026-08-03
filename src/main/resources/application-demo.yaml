@@ -17,13 +17,10 @@ app:
     enabled: true
   api:
     initial-destination-stop-ids:
-      - "121000021"
-      - "121001344"
+      - "107000089"
+      - "100000147"
   topis:
-    cache-ttl: 0s
-  prediction:
-    weather-enabled: false
-    default-weather: "맑음"
+    enabled: false
 
 logging:
   level:

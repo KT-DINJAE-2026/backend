@@ -8,9 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.example.backend.config.AppProperties;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnBean(ArrivalClient.class)
 public class TopisArrivalService {
 
 	private final ArrivalClient arrivalClient;

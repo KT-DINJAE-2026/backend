@@ -39,34 +39,35 @@ class DemoApiContractTests {
 
 	@Test
 	void contextAndSearchAreAvailableOverHttp() throws Exception {
-		HttpResponse<String> context = get("/api/v1/stops/121000019/context");
+		HttpResponse<String> context = get("/api/v1/stops/107000087/context");
 		assertThat(context.statusCode()).isEqualTo(200);
 		assertThat(context.body())
-				.contains("\"stopId\":\"121000019\"")
-				.contains("\"stopId\":\"121000021\"")
-				.contains("\"routeNumber\":\"148\"");
+				.contains("\"stopId\":\"107000087\"")
+				.contains("\"stopId\":\"107000089\"")
+				.contains("\"routeNumber\":\"1014\"");
 
-		String query = URLEncoder.encode("신반포역", StandardCharsets.UTF_8);
+		String query = URLEncoder.encode("보문역", StandardCharsets.UTF_8);
 		HttpResponse<String> search = get(
-				"/api/v1/stops/search?originStopId=121000019&query=" + query
+				"/api/v1/stops/search?originStopId=107000087&query=" + query
 		);
 		assertThat(search.statusCode()).isEqualTo(200);
 		assertThat(search.body())
-				.contains("\"stopId\":\"121000021\"")
-				.contains("\"routeId\":\"100100027\"")
-				.contains("\"routeId\":\"100100057\"");
+				.contains("\"stopId\":\"107000089\"")
+				.contains("\"routeId\":\"100100129\"")
+				.contains("\"routeId\":\"100100031\"");
 	}
 
 	@Test
 	void predictionSuccessMatchesTheServerContract() throws Exception {
-		HttpResponse<String> response = postPrediction("121000019", "121000021");
+		HttpResponse<String> response = postPrediction("107000087", "107000089");
 
 		assertThat(response.statusCode()).isEqualTo(200);
 		assertThat(response.body())
 				.contains("\"status\":\"SUCCESS\"")
 				.contains("\"confidence\":\"MEDIUM\"")
-				.contains("\"tripId\":\"demo-148-low\"")
-				.contains("\"standingBurdenLevel\":\"MEDIUM\"")
+				.contains("\"tripId\":\"mock-trip-100100129-1405\"")
+				.contains("\"routeNumber\":\"1014\"")
+				.contains("\"standingBurdenLevel\":\"LOW\"")
 				.contains("\"segments\"")
 				.doesNotContain("summaryMessage")
 				.doesNotContain("description");
@@ -74,21 +75,21 @@ class DemoApiContractTests {
 
 	@Test
 	void predictionInsufficientDataKeepsArrivalAndTravelFields() throws Exception {
-		HttpResponse<String> response = postPrediction("121000019", "121001344");
+		HttpResponse<String> response = postPrediction("107000087", "100000147");
 
 		assertThat(response.statusCode()).isEqualTo(200);
 		assertThat(response.body())
 				.contains("\"status\":\"INSUFFICIENT_DATA\"")
 				.contains("\"reasonCode\":\"NOT_ENOUGH_HISTORICAL_SAMPLES\"")
-				.contains("\"tripId\":\"demo-452-low\"")
-				.contains("\"travelMinutes\":20")
+				.contains("\"tripId\":\"mock-trip-100100129-1404\"")
+				.contains("\"travelMinutes\":10")
 				.doesNotContain("standingBurdenMinutes")
 				.doesNotContain("segments");
 	}
 
 	@Test
 	void noDirectRouteReturnsStructuredError() throws Exception {
-		HttpResponse<String> response = postPrediction("121000019", "121009999");
+		HttpResponse<String> response = postPrediction("107000087", "121009999");
 
 		assertThat(response.statusCode()).isEqualTo(404);
 		assertThat(response.body())
