@@ -151,7 +151,23 @@ PREDICTION_USER_TYPE_CODE=04
 PREDICTION_DEFAULT_WEATHER=맑음
 ```
 
+AI 배치 산출물은 UTF-8 CSV이며 첫 줄에 아래 헤더를 정확히 사용합니다. 쉼표를 포함하는 값은 허용하지 않습니다.
+
+```csv
+route_id,board_stop_id,alight_stop_id,weekday,prediction_hour,weather,usertype_code,standing_seconds,risk_level,model_confidence,boarding_sample_count,od_sample_count,travel_seconds,model_version
+100100027,121000019,121000021,월,9,맑음,04,150,MEDIUM,0.8120,150,50,600,model-a
+```
+
+표본 부족 행은 `standing_seconds`, `risk_level`, `model_confidence`를 빈 값으로 둘 수 있습니다. 마스터 데이터를 먼저 적재한 뒤 다음처럼 실행하면 유니크 조회 키 기준으로 기존 행을 갱신합니다. 파일 전체가 한 트랜잭션으로 처리되므로 잘못된 행이 있으면 일부만 반영되지 않습니다.
+
+```powershell
+$env:PREDICTION_IMPORT_FILE='C:\data\prediction.csv'
+.\gradlew.bat bootRun --args='--app.prediction.import-enabled=true'
+```
+
 `PREDICTION_SAMPLE_BASIS`는 `BOARDING_STOP` 또는 `OD_PAIR`로 전환할 수 있습니다. 표본이 30건 미만이면 `INSUFFICIENT_DATA`, 30/100/1,000건을 기준으로 신뢰도를 `LOW`/`MEDIUM`/`HIGH`로 변환합니다. 성공 응답에서는 `standingSeconds`가 걸치는 정류장 구간 전체를 입석 구간으로 올림하고, 구간별 시간 합계와 입석 부담 시간 합계를 서버에서 일치시킵니다.
+
+현재 날씨는 Open-Meteo의 `current=weather_code`를 사용합니다. 출발 정류장 좌표를 학습 파이프라인과 동일한 0.1도 격자로 반올림하고, 결과를 15분 캐시합니다. WMO 코드는 `맑음`, `구름많음`, `흐림`, `안개`, `비`, `눈`, `뇌우`로 변환합니다. 호출 실패나 좌표 누락, 해당 날씨 조합 미적재 시 `PREDICTION_DEFAULT_WEATHER` 행으로 폴백합니다. 연동을 끄려면 `WEATHER_API_ENABLED=false`를 사용합니다.
 
 TOPIS 인증·제공기관 장애가 발생하면 예측 요청 전체를 500으로 바꾸지 않고 실시간 차량 목록만 비웁니다. 인증이 정상화되면 코드 변경 없이 동일한 엔드포인트에서 실제 `tripId`, 도착시간, 저상버스 여부가 결합됩니다.
 

@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest(properties = {
 		"app.topis.cache-ttl=0s",
 		"app.prediction.default-weather=맑음",
+		"app.prediction.weather-enabled=false",
 		"app.prediction.sample-basis=BOARDING_STOP"
 })
 @Transactional
@@ -63,6 +64,9 @@ class JourneyPredictionServiceIntegrationTests {
 	@Autowired
 	private FakeArrivalClient arrivalClient;
 
+	@Autowired
+	private FakeWeatherProvider weatherProvider;
+
 	private StopEntity origin;
 	private StopEntity destination;
 	private RouteEntity route;
@@ -70,6 +74,7 @@ class JourneyPredictionServiceIntegrationTests {
 	@BeforeEach
 	void setUp() {
 		arrivalClient.fail = false;
+		weatherProvider.weather = "맑음";
 		origin = saveStop("121000019", "22019", "고속터미널");
 		StopEntity middle = saveStop("121000020", "22020", "고속터미널중앙");
 		destination = saveStop("121000021", "22021", "신반포역.세화여중고");
@@ -136,6 +141,34 @@ class JourneyPredictionServiceIntegrationTests {
 	}
 
 	@Test
+	void selectsCurrentWeatherPredictionBeforeDefaultFallback() {
+		weatherProvider.weather = "비";
+		predictionRepository.save(new PredictionEntity(
+				route, origin, destination, "월", 9, "비", "04",
+				360, "HIGH", new BigDecimal("0.9300"),
+				1200, 300, 660, "rain-model"
+		));
+
+		JourneyPredictionResponse response = predictionService.predict(request(origin, destination));
+
+		assertThat(response.predictionBasis().confidence()).isEqualTo(PredictionConfidence.HIGH);
+		assertThat(response.routes()).allSatisfy(result -> {
+			assertThat(result.travelMinutes()).isEqualTo(11);
+			assertThat(result.standingBurdenLevel()).isEqualTo(StandingBurdenLevel.HIGH);
+		});
+	}
+
+	@Test
+	void fallsBackToDefaultWeatherPredictionWhenCurrentCombinationIsMissing() {
+		weatherProvider.weather = "눈";
+
+		JourneyPredictionResponse response = predictionService.predict(request(origin, destination));
+
+		assertThat(response.status()).isEqualTo(JourneyStatus.SUCCESS);
+		assertThat(response.routes()).allSatisfy(result -> assertThat(result.travelMinutes()).isEqualTo(10));
+	}
+
+	@Test
 	void reverseDirectionReturnsDirectionMismatch() {
 		assertThatThrownBy(() -> predictionService.predict(request(destination, origin)))
 				.isInstanceOf(ApiException.class)
@@ -195,6 +228,12 @@ class JourneyPredictionServiceIntegrationTests {
 		FakeArrivalClient fakeArrivalClient() {
 			return new FakeArrivalClient();
 		}
+
+		@Bean
+		@Primary
+		FakeWeatherProvider fakeWeatherProvider() {
+			return new FakeWeatherProvider();
+		}
 	}
 
 	static class FakeArrivalClient implements ArrivalClient {
@@ -225,6 +264,16 @@ class JourneyPredictionServiceIntegrationTests {
 					lowFloor ? "저상버스" : "일반버스", lowFloor,
 					arrivalMinutes * 60, arrivalMinutes, "", false, false, false
 			);
+		}
+	}
+
+	static class FakeWeatherProvider implements WeatherProvider {
+
+		private String weather = "맑음";
+
+		@Override
+		public String currentWeather(StopEntity stop) {
+			return weather;
 		}
 	}
 }

@@ -49,6 +49,7 @@ public class JourneyPredictionService {
 	private final RouteStopRepository routeStopRepository;
 	private final PredictionRepository predictionRepository;
 	private final TopisArrivalService arrivalService;
+	private final WeatherProvider weatherProvider;
 	private final AppProperties.Prediction properties;
 	private final Clock clock;
 
@@ -58,6 +59,7 @@ public class JourneyPredictionService {
 			RouteStopRepository routeStopRepository,
 			PredictionRepository predictionRepository,
 			TopisArrivalService arrivalService,
+			WeatherProvider weatherProvider,
 			AppProperties appProperties,
 			Clock clock
 	) {
@@ -66,6 +68,7 @@ public class JourneyPredictionService {
 		this.routeStopRepository = routeStopRepository;
 		this.predictionRepository = predictionRepository;
 		this.arrivalService = arrivalService;
+		this.weatherProvider = weatherProvider;
 		this.properties = appProperties.getPrediction();
 		this.clock = clock;
 	}
@@ -83,7 +86,7 @@ public class JourneyPredictionService {
 
 		OffsetDateTime generatedAt = OffsetDateTime.now(clock);
 		String weekday = koreanWeekday(generatedAt.getDayOfWeek());
-		String weather = properties.getDefaultWeather();
+		String weather = weatherProvider.currentWeather(origin);
 		String userTypeCode = resolveUserType(request.usertypeCode());
 		List<RoutePlan> plans = directRoutes.stream()
 				.map(route -> createPlan(route, origin, destination, weekday, generatedAt.getHour(), weather, userTypeCode))
@@ -138,6 +141,13 @@ public class JourneyPredictionService {
 				.findFirstByRoute_IdAndBoardingStop_IdAndAlightingStop_IdAndWeekdayAndHourAndWeatherAndUserTypeCode(
 						route.getId(), origin.getId(), destination.getId(), weekday, hour, weather, userTypeCode
 				);
+		if (prediction.isEmpty() && !properties.getDefaultWeather().equals(weather)) {
+			prediction = predictionRepository
+					.findFirstByRoute_IdAndBoardingStop_IdAndAlightingStop_IdAndWeekdayAndHourAndWeatherAndUserTypeCode(
+							route.getId(), origin.getId(), destination.getId(), weekday, hour,
+							properties.getDefaultWeather(), userTypeCode
+					);
+		}
 		return prediction.map(value -> new RoutePlan(route, path.get(), value));
 	}
 

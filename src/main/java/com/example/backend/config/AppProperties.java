@@ -166,6 +166,12 @@ public class AppProperties {
 		private UserTypeMode userTypeMode = UserTypeMode.FIXED;
 		private String fixedUserTypeCode = "04";
 		private String defaultWeather = "맑음";
+		private boolean importEnabled;
+		private String importFile = "";
+		private boolean weatherEnabled = true;
+		private String weatherBaseUrl = "https://api.open-meteo.com/v1/forecast";
+		private Duration weatherRequestTimeout = Duration.ofSeconds(5);
+		private Duration weatherCacheTtl = Duration.ofMinutes(15);
 		private int minSampleCount = 30;
 		private int mediumConfidenceSampleCount = 100;
 		private int highConfidenceSampleCount = 1000;
@@ -200,6 +206,54 @@ public class AppProperties {
 
 		public void setDefaultWeather(String defaultWeather) {
 			this.defaultWeather = defaultWeather;
+		}
+
+		public boolean isImportEnabled() {
+			return importEnabled;
+		}
+
+		public void setImportEnabled(boolean importEnabled) {
+			this.importEnabled = importEnabled;
+		}
+
+		public String getImportFile() {
+			return importFile;
+		}
+
+		public void setImportFile(String importFile) {
+			this.importFile = importFile;
+		}
+
+		public boolean isWeatherEnabled() {
+			return weatherEnabled;
+		}
+
+		public void setWeatherEnabled(boolean weatherEnabled) {
+			this.weatherEnabled = weatherEnabled;
+		}
+
+		public String getWeatherBaseUrl() {
+			return weatherBaseUrl;
+		}
+
+		public void setWeatherBaseUrl(String weatherBaseUrl) {
+			this.weatherBaseUrl = weatherBaseUrl;
+		}
+
+		public Duration getWeatherRequestTimeout() {
+			return weatherRequestTimeout;
+		}
+
+		public void setWeatherRequestTimeout(Duration weatherRequestTimeout) {
+			this.weatherRequestTimeout = weatherRequestTimeout;
+		}
+
+		public Duration getWeatherCacheTtl() {
+			return weatherCacheTtl;
+		}
+
+		public void setWeatherCacheTtl(Duration weatherCacheTtl) {
+			this.weatherCacheTtl = weatherCacheTtl;
 		}
 
 		public int getMinSampleCount() {
