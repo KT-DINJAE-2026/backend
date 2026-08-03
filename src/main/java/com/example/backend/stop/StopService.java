@@ -77,12 +77,14 @@ public class StopService {
 						originStopId,
 						normalizedQuery,
 						PageRequest.of(0, SEARCH_RESULT_LIMIT)
-				).getContent()
+				)
 				: stopRepository.search(
 						normalizedQuery,
 						PageRequest.of(0, SEARCH_RESULT_LIMIT)
 				).getContent();
-		List<DestinationStopResponse> destinations = candidates.stream()
+		Map<String, StopEntity> uniqueCandidates = new LinkedHashMap<>();
+		candidates.forEach(stop -> uniqueCandidates.putIfAbsent(stop.getId(), stop));
+		List<DestinationStopResponse> destinations = uniqueCandidates.values().stream()
 				.filter(stop -> !stop.getId().equals(originStopId))
 				.map(stop -> toDestination(originStop, stop))
 				.toList();

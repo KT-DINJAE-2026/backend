@@ -1,5 +1,7 @@
 package com.example.backend.repository;
 
+import java.util.List;
+
 import com.example.backend.domain.StopEntity;
 
 import org.springframework.data.domain.Page;
@@ -36,7 +38,7 @@ public interface StopRepository extends JpaRepository<StopEntity, String> {
 	);
 
 	@Query("""
-			select distinct destination.stop
+			select destination.stop
 			from RouteStopEntity origin
 			join RouteStopEntity destination on destination.route = origin.route
 			where origin.stop.id = :originStopId
@@ -44,7 +46,7 @@ public interface StopRepository extends JpaRepository<StopEntity, String> {
 				and destination.stopOrder > origin.stopOrder
 			order by destination.stopOrder
 			""")
-	Page<StopEntity> findReachableStopsByRouteNumber(
+	List<StopEntity> findReachableStopsByRouteNumber(
 			@Param("originStopId") String originStopId,
 			@Param("routeNumber") String routeNumber,
 			Pageable pageable
