@@ -6,6 +6,7 @@ import com.example.backend.prediction.dto.JourneyPredictionResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +30,74 @@ public class JourneyPredictionController {
 	}
 
 	@Operation(summary = "직통 버스 여정 예측")
-	@ApiResponse(responseCode = "200", description = "예측 성공 또는 과거 표본 부족 응답")
+	@ApiResponse(
+			responseCode = "200",
+			description = "예측 성공 또는 과거 표본 부족 응답",
+			content = @Content(
+					schema = @Schema(implementation = JourneyPredictionResponse.class),
+					examples = {
+							@ExampleObject(name = "SUCCESS", value = """
+									{
+									  "status":"SUCCESS",
+									  "generatedAt":"2026-08-03T09:00:00+09:00",
+									  "originStopId":"121000019",
+									  "destinationStopId":"121000021",
+									  "predictionBasis":{"confidence":"MEDIUM"},
+									  "routes":[{
+									    "tripId":"demo-148-low",
+									    "routeId":"100100027",
+									    "routeNumber":"148",
+									    "direction":"서초구 방면",
+									    "vehicleType":"저상버스",
+									    "isLowFloor":true,
+									    "arrivalMinutes":2,
+									    "travelMinutes":10,
+									    "standingBurdenMinutes":3,
+									    "standingBurdenLevel":"MEDIUM",
+									    "segments":[
+									      {
+									        "fromStopId":"121000019",
+									        "fromStopName":"고속터미널",
+									        "toStopId":"121000020",
+									        "toStopName":"고속터미널",
+									        "durationMinutes":3,
+									        "congestionLevel":"CROWDED"
+									      },
+									      {
+									        "fromStopId":"121000020",
+									        "fromStopName":"고속터미널",
+									        "toStopId":"121000021",
+									        "toStopName":"신반포역.세화여중고",
+									        "durationMinutes":7,
+									        "congestionLevel":"RELAXED"
+									      }
+									    ]
+									  }]
+									}
+									"""),
+							@ExampleObject(name = "INSUFFICIENT_DATA", value = """
+									{
+									  "status":"INSUFFICIENT_DATA",
+									  "reasonCode":"NOT_ENOUGH_HISTORICAL_SAMPLES",
+									  "generatedAt":"2026-08-03T09:00:00+09:00",
+									  "originStopId":"121000019",
+									  "destinationStopId":"121001344",
+									  "predictionBasis":{"confidence":"UNAVAILABLE"},
+									  "routes":[{
+									    "tripId":"demo-452-low",
+									    "routeId":"113000002",
+									    "routeNumber":"452",
+									    "direction":"서초구 방면",
+									    "vehicleType":"저상버스",
+									    "isLowFloor":true,
+									    "arrivalMinutes":5,
+									    "travelMinutes":20
+									  }]
+									}
+									""")
+					}
+			)
+	)
 	@ApiResponse(
 			responseCode = "404",
 			description = "정류장 또는 직통 노선 없음",

@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:backend-demo;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  docker:
+    compose:
+      enabled: false
+
+app:
+  demo:
+    enabled: true
+  api:
+    initial-destination-stop-ids:
+      - "121000021"
+      - "121001344"
+  topis:
+    cache-ttl: 0s
+  prediction:
+    weather-enabled: false
+    default-weather: "맑음"
+
+logging:
+  level:
+    com.example.backend: INFO

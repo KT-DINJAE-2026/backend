@@ -7,6 +7,8 @@ spring:
     default: local
 
 app:
+  demo:
+    enabled: false
   api:
     initial-destination-stop-ids:
       - "121000021"

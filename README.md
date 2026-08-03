@@ -104,6 +104,24 @@ H2 프로필의 데이터 파일은 `.local/backend-smoke.mv.db`에 생성되며
 
 Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다. API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
 
+### FE 연결용 demo 프로필
+
+AI 배치 결과와 TOPIS 인증 상태에 관계없이 FE가 실제 HTTP 연결을 검증할 수 있도록 격리된 `demo` 프로필을 제공합니다. 메모리 H2에 서초구 성공·데이터 부족·직통 없음 시나리오를 넣고, 고정된 도착 예정 차량을 반환합니다. 로컬 MySQL과 운영 설정에는 데이터를 기록하지 않습니다.
+
+```powershell
+.\gradlew.bat bootRun --args='--spring.profiles.active=demo'
+```
+
+서버가 실행되면 `http://localhost:8080/swagger-ui.html`에서 다음 시나리오를 호출할 수 있습니다.
+
+| 시나리오 | 출발 정류장 | 도착 정류장 | 결과 |
+|---|---|---|---|
+| 예측 성공 | `121000019` | `121000021` | `SUCCESS`, 148·360번 도착 차량과 구간 예측 |
+| 표본 부족 | `121000019` | `121001344` | `INSUFFICIENT_DATA`, 452번 도착·이동시간 |
+| 직통 없음 | `121000019` | `121009999` | `404 NO_DIRECT_ROUTE` |
+
+이 프로필의 값은 FE–BE 계약 확인 전용이며 AI 성능이나 실제 버스 운행 결과로 사용하지 않습니다. FE 서버 모드는 `VITE_API_MODE=server`, `VITE_API_BASE_URL=http://localhost:8080`을 사용합니다.
+
 ## 서울시 버스 도착정보 연동
 
 TOPIS `getArrInfoByRoute`를 사용해 정류소·노선·정류소 순번별 첫 번째와 두 번째 도착 예정 차량을 조회합니다. `traTime1/2`는 초 단위로 해석해 올림한 분 단위 도착시간을 만들고, `vehId1/2`는 차량 단위 `tripId`, `busType1/2`는 일반·저상·굴절버스 구분으로 변환합니다. 같은 정류소·노선·순번 조회는 기본 20초 동안 메모리에 캐시합니다.

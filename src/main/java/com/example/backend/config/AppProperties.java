@@ -13,6 +13,7 @@ public class AppProperties {
 	private final MasterData masterData = new MasterData();
 	private final Topis topis = new Topis();
 	private final Prediction prediction = new Prediction();
+	private final Demo demo = new Demo();
 
 	public Api getApi() {
 		return api;
@@ -28,6 +29,10 @@ public class AppProperties {
 
 	public Prediction getPrediction() {
 		return prediction;
+	}
+
+	public Demo getDemo() {
+		return demo;
 	}
 
 	public static class Api {
@@ -278,6 +283,19 @@ public class AppProperties {
 
 		public void setHighConfidenceSampleCount(int highConfidenceSampleCount) {
 			this.highConfidenceSampleCount = highConfidenceSampleCount;
+		}
+	}
+
+	public static class Demo {
+
+		private boolean enabled;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
 		}
 	}
 }

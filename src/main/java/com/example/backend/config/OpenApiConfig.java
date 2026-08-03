@@ -14,6 +14,6 @@ public class OpenApiConfig {
 		return new OpenAPI().info(new Info()
 				.title("교통약자 입석 위험 안내 API")
 				.version("v1")
-				.description("QR 정류장 진입과 직통 버스 정류장 검색 API"));
+				.description("QR 정류장 진입, 직통 정류장 검색, 버스 도착 및 입석 부담 예측 API"));
 	}
 }
