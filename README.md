@@ -39,16 +39,22 @@ Gradle은 설치할 필요 없습니다. 프로젝트에 포함된 Wrapper(`./gr
 ./gradlew test
 ```
 
-Windows에서 저장소 상위 경로에 한글이 포함돼 Gradle 테스트 워커가 클래스 경로를 읽지 못하면 빌드 산출물만 ASCII 임시 경로로 바꿔 실행할 수 있습니다.
+Windows에서 저장소 상위 경로에 한글이 포함돼 Gradle 테스트 워커가 클래스 경로를 읽지 못하면 빌드 산출물만 ASCII 임시 경로로 바꿔 실행할 수 있습니다. 이전 빌드에 삭제된 테스트 클래스 정보가 남은 경우까지 정리하도록 `clean test`를 사용합니다.
 
 ```powershell
-.\gradlew.bat test -PcustomBuildDir="$env:TEMP\backend-gradle-build"
+.\gradlew.bat clean test -PcustomBuildDir="$env:TEMP\backend-gradle-build"
 ```
 
 빌드 (실행 가능한 jar 생성 → `build/libs/`):
 
 ```bash
 ./gradlew build
+```
+
+Windows 한글 경로에서 전체 빌드를 실행할 때도 같은 우회 옵션을 사용합니다.
+
+```powershell
+.\gradlew.bat clean build -PcustomBuildDir="$env:TEMP\backend-gradle-build"
 ```
 
 ## 프로젝트 구조
