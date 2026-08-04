@@ -1,3 +1,38 @@
 spring:
   application:
     name: backend
+  config:
+    import: optional:file:.env[.properties]
+  profiles:
+    default: local
+
+app:
+  demo:
+    enabled: false
+  api:
+    initial-destination-stop-ids:
+      - "107000089"
+      - "100000147"
+  master-data:
+    import-enabled: false
+    city-name: "서울특별시"
+    stop-file: ${MASTER_STOP_FILE:}
+    route-file: ${MASTER_ROUTE_FILE:}
+    route-stop-file: ${MASTER_ROUTE_STOP_FILE:}
+  topis:
+    enabled: ${SEOUL_BUS_API_ENABLED:true}
+    base-url: ${SEOUL_BUS_API_BASE_URL:http://ws.bus.go.kr/api/rest}
+    service-key: ${SEOUL_BUS_API_KEY:}
+    connect-timeout: 3s
+    request-timeout: 5s
+    cache-ttl: 20s
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      force-response: true
