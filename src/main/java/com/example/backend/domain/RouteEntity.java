@@ -7,6 +7,13 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+/**
+ * 국토교통부 기반정보의 버스 노선 마스터이다.
+ *
+ * <p>{@code id}는 외부 API와 FE 계약에 사용하는 표준 노선 ID이고,
+ * 제공기관의 로컬 ID는 기관 코드와 함께 원천 데이터 재매핑에 사용한다.
+ * 현재 종점명은 화면 방향 문구의 임시 근거이므로 실제 승강장 방향과 다를 수 있다.</p>
+ */
 @Entity
 @Table(name = "route", uniqueConstraints = {
 		@UniqueConstraint(

@@ -10,8 +10,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 정류장명·ARS·노선 번호 검색과 출발지 이후 도달 가능한 정류장 조회를 담당한다. */
 public interface StopRepository extends JpaRepository<StopEntity, String> {
 
+	/** 직통 여부와 무관하게 검색어가 일치하는 정류장을 반환한다. */
 	@Query("""
 			select distinct stop
 			from StopEntity stop
@@ -24,6 +26,7 @@ public interface StopRepository extends JpaRepository<StopEntity, String> {
 			""")
 	Page<StopEntity> search(@Param("query") String query, Pageable pageable);
 
+	/** 출발 정류장과 같은 노선에서 더 큰 순번을 가진 모든 도착 후보를 반환한다. */
 	@Query("""
 			select distinct destination.stop
 			from RouteStopEntity origin
@@ -37,6 +40,7 @@ public interface StopRepository extends JpaRepository<StopEntity, String> {
 			Pageable pageable
 	);
 
+	/** 정확한 노선 번호 검색용으로, 해당 노선에서 출발지 이후 정류장만 노선 순서대로 반환한다. */
 	@Query("""
 			select destination.stop
 			from RouteStopEntity origin

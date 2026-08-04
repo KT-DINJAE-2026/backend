@@ -3,6 +3,7 @@ package com.example.backend;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+/** 교통약자 버스 여정 안내 백엔드의 Spring Boot 진입점이다. */
 @SpringBootApplication
 public class BackendApplication {
 

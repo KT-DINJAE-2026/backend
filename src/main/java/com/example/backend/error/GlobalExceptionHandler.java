@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/** 모든 REST 예외를 FE 공통 오류 형식으로 변환하고 추적 ID와 함께 기록한다. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -41,6 +42,7 @@ public class GlobalExceptionHandler {
 	}
 
 	private ResponseEntity<ApiErrorResponse> response(ErrorCode errorCode, Exception exception) {
+		// 별도 분산 추적 도구가 없는 현재 단계에서는 짧은 ID로 FE 오류와 서버 로그를 연결한다.
 		String traceId = UUID.randomUUID().toString().substring(0, 8);
 		if (errorCode.status().is5xxServerError()) {
 			log.error("traceId={} code={}", traceId, errorCode.name(), exception);

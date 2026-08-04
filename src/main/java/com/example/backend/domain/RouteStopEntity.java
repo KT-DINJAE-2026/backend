@@ -12,6 +12,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+/**
+ * 노선이 정류장을 지나는 순서를 나타내는 연결 엔티티이다.
+ *
+ * <p>{@code stopOrder}가 큰 정류장만 현재 진행 방향의 이후 정류장으로 취급한다.
+ * 순환 노선은 같은 정류장이 여러 순번에 나타날 수 있으므로 경로 조회 시 ID만 비교하면 안 된다.</p>
+ */
 @Entity
 @Table(name = "route_stop",
 		uniqueConstraints = @UniqueConstraint(

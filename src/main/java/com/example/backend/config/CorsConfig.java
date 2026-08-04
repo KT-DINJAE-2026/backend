@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/** FE 개발 서버와 정식 Vercel 배포 주소에 한해 API 교차 출처 요청을 허용한다. */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
@@ -18,6 +19,7 @@ public class CorsConfig implements WebMvcConfigurer {
 
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
+		// Preview 배포 주소는 매번 바뀌므로 현재 목록에 포함하지 않는다.
 		registry.addMapping("/api/**")
 				.allowedOrigins(ALLOWED_ORIGINS.toArray(String[]::new))
 				.allowedMethods(

@@ -11,6 +11,12 @@ import com.example.backend.config.AppProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
+/**
+ * 동일한 TOPIS 조회를 짧은 시간 동안 재사용하는 캐시 계층이다.
+ *
+ * <p>도착정보는 자주 바뀌지만 검색 화면의 반복 요청마다 외부 API를 호출하지 않도록
+ * 기본 20초 TTL을 적용한다. 현재 여정 테스트 서비스에는 아직 연결되지 않았다.</p>
+ */
 @Service
 @ConditionalOnBean(ArrivalClient.class)
 public class TopisArrivalService {
@@ -34,6 +40,7 @@ public class TopisArrivalService {
 
 		CacheKey key = new CacheKey(stopId, routeId, stopOrder);
 		Instant now = clock.instant();
+		// compute를 사용해 동일 키의 동시 요청도 외부 호출 한 번으로 합친다.
 		CacheEntry entry = cache.compute(key, (ignored, current) -> {
 			if (current != null && current.expiresAt().isAfter(now)) {
 				return current;

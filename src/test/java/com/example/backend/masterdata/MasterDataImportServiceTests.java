@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+/** DAT 컬럼 위치와 로컬 ID에서 표준 ID로 이어지는 적재 관계를 작은 파일로 검증한다. */
 @SpringBootTest
 @Transactional
 class MasterDataImportServiceTests {
@@ -61,6 +62,7 @@ class MasterDataImportServiceTests {
 	}
 
 	private String stopRow(String localId, String stopId, String name, String arsId) {
+		// 운영 파일과 같은 인덱스에만 값을 넣어 포맷 변경을 테스트가 감지하게 한다.
 		String[] fields = new String[22];
 		fields[0] = "20250401";
 		fields[2] = "11100";

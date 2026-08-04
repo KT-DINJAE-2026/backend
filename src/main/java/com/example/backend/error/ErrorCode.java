@@ -2,6 +2,10 @@ package com.example.backend.error;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * HTTP 상태와 안정적인 FE 분기 코드를 한곳에서 관리한다.
+ * enum 이름은 API의 {@code code}로 그대로 노출되므로 변경 시 FE 계약도 함께 갱신해야 한다.
+ */
 public enum ErrorCode {
 
 	INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다."),

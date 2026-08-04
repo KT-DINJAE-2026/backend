@@ -26,7 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * AI 연동 방식이 확정되기 전까지 FE 계약 검증용 데이터를 반환합니다.
+ * AI 연동 방식이 확정되기 전까지 FE 계약 검증용 여정 데이터를 만든다.
+ *
+ * <p>정류장과 직통 노선 및 경유 순서는 DB의 실제 기반정보를 사용하지만,
+ * 도착시간·차량·혼잡도 값은 고정 시나리오 또는 결정적인 규칙으로 생성한다.
+ * TOPIS나 실제 AI 결과로 오해하지 않도록 운영 서비스로 그대로 사용하면 안 된다.</p>
  */
 @Service
 @Transactional(readOnly = true)
@@ -70,6 +74,7 @@ public class JourneyTestDataService {
 		StopEntity destination = getStop(request.destinationStopId());
 		List<RouteEntity> directRoutes = routeRepository.findDirectRoutes(origin.getId(), destination.getId());
 		if (directRoutes.isEmpty()) {
+			// 두 정류장을 모두 지나지만 순서가 반대인 경우와 아예 공통 노선이 없는 경우를 구분한다.
 			if (!routeRepository.findRoutesConnectingStops(origin.getId(), destination.getId()).isEmpty()) {
 				throw new ApiException(ErrorCode.STOP_DIRECTION_MISMATCH);
 			}
@@ -108,10 +113,12 @@ public class JourneyTestDataService {
 			boolean insufficient
 	) {
 		Map<String, TestRoute> configured = insufficient ? INSUFFICIENT_ROUTES : SUCCESS_ROUTES;
+		// FE Mock과 합의된 데모 노선은 고정값을 유지해 화면 회귀 테스트가 흔들리지 않게 한다.
 		TestRoute predefined = configured.get(route.getId());
 		if (predefined != null) {
 			return predefined;
 		}
+		// 다른 직통 구간도 API 구조를 시험할 수 있도록 노선 순서 기반의 결정적인 값을 만든다.
 		int segmentCount = Math.max(1, path.size() - 1);
 		int travelMinutes = Math.max(3, segmentCount * 2);
 		boolean lowFloor = index % 2 == 0;
@@ -141,6 +148,7 @@ public class JourneyTestDataService {
 	) {
 		String vehicleType = testRoute.lowFloor() ? "저상버스" : "일반버스";
 		if (insufficient) {
+			// 데이터 부족은 200 응답을 유지하되 근거 없는 혼잡 관련 필드는 null로 두어 JSON에서 생략한다.
 			return new JourneyRouteResponse(
 					testRoute.tripId(), route.getId(), route.getNumber(), direction(route),
 					vehicleType, testRoute.lowFloor(), testRoute.arrivalMinutes(), testRoute.travelMinutes(),
@@ -160,6 +168,7 @@ public class JourneyTestDataService {
 		if (segmentCount <= 0) {
 			return List.of();
 		}
+		// 전체 구간 합이 travelMinutes와 정확히 같도록 몫과 나머지를 앞 구간부터 배분한다.
 		int baseDuration = testRoute.travelMinutes() / segmentCount;
 		int remainder = testRoute.travelMinutes() % segmentCount;
 		int elapsedMinutes = 0;
@@ -189,6 +198,10 @@ public class JourneyTestDataService {
 				.findByRoute_IdAndStop_IdOrderByStopOrder(routeId, originStopId);
 		List<RouteStopEntity> destinations = routeStopRepository
 				.findByRoute_IdAndStop_IdOrderByStopOrder(routeId, destinationStopId);
+		/*
+		 * 순환 노선은 같은 정류장 ID가 여러 순번에 존재할 수 있다.
+		 * 가능한 정방향 순번 쌍 중 가장 짧은 구간을 선택해 한 바퀴를 불필요하게 도는 경로를 피한다.
+		 */
 		int[] selected = origins.stream()
 				.flatMap(origin -> destinations.stream()
 						.filter(destination -> destination.getStopOrder() > origin.getStopOrder())
@@ -209,6 +222,7 @@ public class JourneyTestDataService {
 	}
 
 	private static String direction(RouteEntity route) {
+		// 실제 승강장 방향 데이터가 없어 현재는 노선 종점명을 임시 방향 문구로 사용한다.
 		return route.getEndStopName() == null ? null : route.getEndStopName() + " 방면";
 	}
 

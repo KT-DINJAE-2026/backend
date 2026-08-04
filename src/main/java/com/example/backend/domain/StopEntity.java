@@ -9,6 +9,12 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+/**
+ * 국토교통부 기반정보의 버스 정류장 마스터이다.
+ *
+ * <p>{@code id}는 QR과 API에 사용하는 표준 정류장 ID이다. ARS 번호와 좌표는 원천 데이터에서
+ * 누락될 수 있어 DB에서는 nullable이며, 운영 전에 FE 필수값 보장 정책을 확정해야 한다.</p>
+ */
 @Entity
 @Table(name = "stop", uniqueConstraints = {
 		@UniqueConstraint(

@@ -22,6 +22,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 
+/**
+ * 실제 HTTP 경계를 통해 demo 프로필과 FE 핵심 계약을 함께 검증한다.
+ * 필드 제거·enum 변경·CORS·Swagger 경로 변경 시 FE 연동 회귀를 잡는 테스트이다.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("demo")
 @Import(DemoApiContractTests.FixedClockConfig.class)
@@ -154,6 +158,7 @@ class DemoApiContractTests {
 		@Bean
 		@Primary
 		Clock demoClock() {
+			// generatedAt을 고정해 시간대와 응답 예시가 실행 시각에 따라 흔들리지 않게 한다.
 			return Clock.fixed(
 					Instant.parse("2026-08-03T00:00:00Z"),
 					ZoneId.of("Asia/Seoul")

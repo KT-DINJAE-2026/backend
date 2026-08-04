@@ -13,6 +13,7 @@ import com.example.backend.config.AppProperties;
 
 import org.junit.jupiter.api.Test;
 
+/** 동일 조회 키의 캐시 재사용과 TTL 만료 후 재호출을 검증한다. */
 class TopisArrivalServiceTests {
 
 	@Test
@@ -39,6 +40,7 @@ class TopisArrivalServiceTests {
 		assertThat(calls).hasValue(2);
 	}
 
+	/** 실제 대기 없이 캐시 만료 시각을 전진시키기 위한 테스트 전용 Clock이다. */
 	private static final class MutableClock extends Clock {
 
 		private Instant instant;

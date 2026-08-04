@@ -18,6 +18,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 출발·도착 정류장을 잇는 직통 버스의 여정 분석 API를 노출한다.
+ *
+ * <p>현재는 {@link JourneyTestDataService}를 사용한다. TOPIS·AI 연동 계약이 확정되면
+ * 컨트롤러 응답 계약을 유지하면서 실제 서비스 구현으로 교체하는 것이 목표다.</p>
+ */
 @Tag(name = "Journeys", description = "직통 버스 도착 및 입석 부담 예측")
 @RestController
 @RequestMapping(path = "/api/v1/journeys", produces = MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")

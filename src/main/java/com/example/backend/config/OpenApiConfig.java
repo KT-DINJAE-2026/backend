@@ -6,6 +6,7 @@ import io.swagger.v3.oas.models.info.Info;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/** Swagger UI에 표시할 API 문서의 공통 메타데이터를 정의한다. */
 @Configuration
 public class OpenApiConfig {
 

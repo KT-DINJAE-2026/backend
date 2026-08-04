@@ -10,6 +10,12 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/**
+ * {@code app.master-data.import-enabled=true}일 때만 기반정보 적재를 실행하는 시작 훅이다.
+ *
+ * <p>대용량 파일을 평소 서버 시작마다 읽지 않도록 기본값은 비활성화되어 있다.
+ * STTN, ROUTE, ROUTESTTN은 반드시 같은 기준일 파일을 사용해야 한다.</p>
+ */
 @Component
 @ConditionalOnProperty(prefix = "app.master-data", name = "import-enabled", havingValue = "true")
 public class MasterDataImportRunner implements ApplicationRunner {

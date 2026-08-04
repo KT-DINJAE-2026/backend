@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 정류장 context, 노선 번호 검색, 직통 방향 판정의 DB 연동 규칙을 검증한다. */
 @SpringBootTest(properties = "app.api.initial-destination-stop-ids[0]=121000021")
 @Transactional
 class StopServiceIntegrationTests {

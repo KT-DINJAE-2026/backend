@@ -6,6 +6,12 @@ import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * {@code application*.yaml}의 {@code app.*} 사용자 설정을 타입으로 묶는다.
+ *
+ * <p>프로필별 설정과 환경 변수는 이 객체를 통해 서비스에 전달한다. 새 설정을 추가할 때는
+ * README의 설정 표와 각 프로필 YAML도 함께 갱신한다.</p>
+ */
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
 
@@ -30,6 +36,7 @@ public class AppProperties {
 		return demo;
 	}
 
+	/** QR 진입 직후 보여줄 초기 목적지 목록 등 API 동작 설정. */
 	public static class Api {
 
 		private List<String> initialDestinationStopIds = new ArrayList<>();
@@ -43,6 +50,7 @@ public class AppProperties {
 		}
 	}
 
+	/** 국토교통부 기반정보 파일 적재 범위와 파일 경로 설정. */
 	public static class MasterData {
 
 		private boolean importEnabled;
@@ -92,6 +100,7 @@ public class AppProperties {
 		}
 	}
 
+	/** 서울시 버스 도착정보 API의 인증·제한시간·캐시 설정. */
 	public static class Topis {
 
 		private boolean enabled = true;
@@ -150,6 +159,7 @@ public class AppProperties {
 		}
 	}
 
+	/** 외부 시스템 없이 FE 계약을 검증하는 demo 데이터 활성화 설정. */
 	public static class Demo {
 
 		private boolean enabled;

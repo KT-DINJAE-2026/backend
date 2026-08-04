@@ -16,6 +16,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * FE가 외부 시스템 없이 API 계약을 시험하도록 demo 프로필의 H2 데이터를 구성한다.
+ *
+ * <p>성공, 혼잡도 데이터 부족, 직통 노선 없음 시나리오를 재현하기 위한 데이터이며
+ * 실제 운행·예측 데이터로 사용하면 안 된다. 서버가 재시작되면 메모리 H2와 함께 사라진다.</p>
+ */
 @Component
 @ConditionalOnProperty(prefix = "app.demo", name = "enabled", havingValue = "true")
 public class DemoDataInitializer implements ApplicationRunner {
@@ -37,6 +43,7 @@ public class DemoDataInitializer implements ApplicationRunner {
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
+		// 목적지 ID는 JourneyTestDataService의 고정 시나리오 ID와 맞춰야 한다.
 		StopEntity origin = saveStop(
 				"107000087", "08177", "성북구청.성북경찰서", "37.5881513802", "127.0174306588"
 		);
@@ -56,6 +63,7 @@ public class DemoDataInitializer implements ApplicationRunner {
 		RouteEntity route103 = saveRoute("100100008", "103", "성북구청", "동대문", "115");
 		RouteEntity route142 = saveRoute("100100021", "142", "성북구청", "창신동", "115");
 
+		// stopOrder의 대소관계가 직통/역방향 판정과 구간 순서를 결정한다.
 		routeStopRepository.saveAll(List.of(
 				new RouteStopEntity(route1014, origin, 10, 300),
 				new RouteStopEntity(route1014, success, 11, 500),

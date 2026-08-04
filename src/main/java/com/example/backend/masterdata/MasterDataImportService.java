@@ -18,11 +18,25 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * 국토교통부 표준 기반정보 DAT 파일을 정류장·노선·경유 테이블로 적재한다.
+ *
+ * <p>파일은 UTF-8, {@code |} 구분, 헤더 없음 형식이다. 컬럼 위치는 제공기관 포맷에 종속되므로
+ * 새 기준 파일을 적용하기 전에 아래 인덱스 매핑과 샘플 테스트를 함께 확인해야 한다.
+ * MySQL의 {@code on duplicate key update}를 사용하므로 동일 기준 파일 재실행은 upsert로 처리된다.</p>
+ */
 @Service
 public class MasterDataImportService {
 
 	private static final Logger log = LoggerFactory.getLogger(MasterDataImportService.class);
 	private static final int BATCH_SIZE = 1_000;
+
+	/*
+	 * STTN: 기관=2, 로컬정류장=3, 표준정류장=4, 정류장명=6, 시도=10,
+	 * 시군구=12, ARS=16, 위도=17, 경도=18
+	 * ROUTE: 기관=2, 로컬노선=3, 표준노선=4, 번호=6, 유형=7, 기점=12, 종점=13, 운송유형=14
+	 * ROUTESTTN: 기관=2, 로컬노선=3, 순번=4, 로컬정류장=5, 시도=13, 구간거리=19
+	 */
 
 	private static final String STOP_UPSERT = """
 			insert into stop (
@@ -71,6 +85,7 @@ public class MasterDataImportService {
 	}
 
 	public void importFiles(Path stopFile, Path routeFile, Path routeStopFile) throws IOException {
+		// 경유정보가 로컬 ID를 표준 ID로 변환할 수 있도록 정류장과 노선을 먼저 적재한다.
 		log.info("Importing stop master data from {}", stopFile);
 		Map<String, String> stopIdsByLocalId = importStops(stopFile);
 		log.info("Importing route master data from {}", routeFile);
@@ -140,6 +155,7 @@ public class MasterDataImportService {
 			if (fields.length < 20 || !cityName.equals(fields[13])) {
 				return;
 			}
+			// 로컬 ID는 제공기관마다 겹칠 수 있으므로 기관 코드를 합친 키로 표준 ID를 찾는다.
 			String routeId = routeIdsByLocalId.get(sourceLocalKey(fields[2], fields[3]));
 			String stopId = stopIdsByLocalId.get(sourceLocalKey(fields[2], fields[5]));
 			Integer stopOrder = integerOrNull(fields[4]);
@@ -190,6 +206,7 @@ public class MasterDataImportService {
 		try {
 			return blank(value) ? null : new BigDecimal(value);
 		} catch (NumberFormatException ignored) {
+			// 일부 원천 행의 결측·비정상 좌표 때문에 전체 적재를 중단하지 않는다.
 			return null;
 		}
 	}

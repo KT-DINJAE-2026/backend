@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+/** 실제 네트워크 대신 로컬 HTTP 서버로 TOPIS 요청 URI와 XML 변환 계약을 검증한다. */
 class TopisArrivalClientTests {
 
 	private final AtomicReference<String> responseBody = new AtomicReference<>();
@@ -30,6 +31,7 @@ class TopisArrivalClientTests {
 
 	@BeforeEach
 	void setUp() throws IOException {
+		// 포털 응답과 raw query를 모두 통제해 인증키 이중 인코딩 회귀를 함께 검증한다.
 		server = HttpServer.create(new InetSocketAddress(0), 0);
 		server.createContext("/api/rest/arrive/getArrInfoByRoute", this::respond);
 		server.start();

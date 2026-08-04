@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/** QR 출발 정류장 context와 도착 정류장 검색 API를 노출하는 얇은 웹 계층이다. */
 @Tag(name = "Stops", description = "정류장 진입 정보와 직통 노선 검색")
 @Validated
 @RestController
