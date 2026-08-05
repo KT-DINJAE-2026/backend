@@ -15,10 +15,6 @@ spring:
 app:
   demo:
     enabled: true
-  api:
-    initial-destination-stop-ids:
-      - "107000089"
-      - "100000147"
   topis:
     enabled: false
 

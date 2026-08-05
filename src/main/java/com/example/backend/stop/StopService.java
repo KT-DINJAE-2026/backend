@@ -10,9 +10,8 @@ import java.util.Map;
 
 import com.example.backend.config.AppProperties;
 import com.example.backend.domain.RouteEntity;
+import com.example.backend.domain.RouteDirectionDescription;
 import com.example.backend.domain.StopEntity;
-import com.example.backend.error.ApiException;
-import com.example.backend.error.ErrorCode;
 import com.example.backend.repository.RouteRepository;
 import com.example.backend.repository.StopRepository;
 import com.example.backend.repository.StopRouteProjection;
@@ -58,7 +57,7 @@ public class StopService {
 	}
 
 	public StopContextResponse getContext(String stopId) {
-		StopEntity currentStop = getStop(stopId);
+		StopEntity currentStop = stopRepository.getRequired(stopId);
 		List<StopEntity> destinationStops = configuredDestinationStops(stopId);
 		if (destinationStops.isEmpty()) {
 			// 설정된 데모·초기 목적지가 없을 때만 실제 정방향 도달 후보를 제한 개수만 조회한다.
@@ -84,7 +83,7 @@ public class StopService {
 	}
 
 	public StopSearchResponse search(String originStopId, String query) {
-		StopEntity originStop = getStop(originStopId);
+		StopEntity originStop = stopRepository.getRequired(originStopId);
 		String normalizedQuery = query.strip();
 		/*
 		 * 정확한 노선 번호는 그 노선의 정방향 도착 후보만 노선 순서로 보여준다.
@@ -111,11 +110,6 @@ public class StopService {
 				.map(stop -> toDestination(stop, routeLookup))
 				.toList();
 		return new StopSearchResponse(destinations);
-	}
-
-	private StopEntity getStop(String stopId) {
-		return stopRepository.findById(stopId)
-				.orElseThrow(() -> new ApiException(ErrorCode.STOP_NOT_FOUND));
 	}
 
 	private List<StopEntity> configuredDestinationStops(String originStopId) {
@@ -164,7 +158,7 @@ public class StopService {
 	}
 
 	private String directionFor(List<RouteEntity> preferredRoutes, List<RouteEntity> fallbackRoutes) {
-		// 실제 승강장 방향 데이터가 없어 현재는 첫 번째 관련 노선의 종점명을 대표 방향으로 사용한다.
+		// 여러 노선이 있으면 기존과 같이 첫 번째 유효 종점명을 대표 방향으로 선택한다.
 		List<RouteEntity> routes = preferredRoutes.isEmpty()
 				? fallbackRoutes
 				: preferredRoutes;
@@ -172,7 +166,7 @@ public class StopService {
 				.map(RouteEntity::getEndStopName)
 				.filter(value -> value != null && !value.isBlank())
 				.findFirst()
-				.map(value -> value + " 방면")
+				.map(RouteDirectionDescription::fromEndStopName)
 				.orElse(null);
 	}
 

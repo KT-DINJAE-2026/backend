@@ -45,9 +45,11 @@ class DemoApiContractTests {
 	void contextAndSearchAreAvailableOverHttp() throws Exception {
 		HttpResponse<String> context = get("/api/v1/stops/107000087/context");
 		assertThat(context.statusCode()).isEqualTo(200);
+		assertUtf8Json(context);
 		assertThat(context.body())
 				.contains("\"stopId\":\"107000087\"")
 				.contains("\"stopId\":\"107000089\"")
+				.contains("\"stopId\":\"100000147\"")
 				.contains("\"routeNumber\":\"1014\"");
 
 		String query = URLEncoder.encode("보문역", StandardCharsets.UTF_8);
@@ -55,6 +57,7 @@ class DemoApiContractTests {
 				"/api/v1/stops/search?originStopId=107000087&query=" + query
 		);
 		assertThat(search.statusCode()).isEqualTo(200);
+		assertUtf8Json(search);
 		assertThat(search.body())
 				.contains("\"stopId\":\"107000089\"")
 				.contains("\"routeId\":\"100100129\"")
@@ -96,6 +99,7 @@ class DemoApiContractTests {
 		HttpResponse<String> response = postPrediction("107000087", "121009999");
 
 		assertThat(response.statusCode()).isEqualTo(404);
+		assertUtf8Json(response);
 		assertThat(response.body())
 				.contains("\"code\":\"NO_DIRECT_ROUTE\"")
 				.contains("\"message\"")
@@ -181,10 +185,18 @@ class DemoApiContractTests {
 
 	private void assertError(HttpResponse<String> response, int status, String code) {
 		assertThat(response.statusCode()).isEqualTo(status);
+		assertUtf8Json(response);
 		assertThat(response.body())
 				.contains("\"code\":\"" + code + "\"")
 				.contains("\"message\"")
 				.contains("\"traceId\"");
+	}
+
+	private void assertUtf8Json(HttpResponse<String> response) {
+		assertThat(response.headers().firstValue("Content-Type"))
+				.hasValueSatisfying(contentType -> assertThat(contentType.toLowerCase())
+						.contains("application/json")
+						.contains("charset=utf-8"));
 	}
 
 	@TestConfiguration

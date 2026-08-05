@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.example.backend.domain.BusVehicleType;
+import com.example.backend.domain.RouteDirectionDescription;
 import com.example.backend.domain.RouteEntity;
 import com.example.backend.domain.RouteStopEntity;
 import com.example.backend.domain.StopEntity;
@@ -70,8 +72,8 @@ public class JourneyTestDataService {
 	}
 
 	public JourneyPredictionResponse create(JourneyPredictionRequest request) {
-		StopEntity origin = getStop(request.originStopId());
-		StopEntity destination = getStop(request.destinationStopId());
+		StopEntity origin = stopRepository.getRequired(request.originStopId());
+		StopEntity destination = stopRepository.getRequired(request.destinationStopId());
 		List<RouteEntity> directRoutes = routeRepository.findDirectRoutes(origin.getId(), destination.getId());
 		if (directRoutes.isEmpty()) {
 			// 두 정류장을 모두 지나지만 순서가 반대인 경우와 아예 공통 노선이 없는 경우를 구분한다.
@@ -146,7 +148,8 @@ public class JourneyTestDataService {
 			TestRoute testRoute,
 			boolean insufficient
 	) {
-		String vehicleType = testRoute.lowFloor() ? "저상버스" : "일반버스";
+		String vehicleType = (testRoute.lowFloor() ? BusVehicleType.LOW_FLOOR : BusVehicleType.STANDARD)
+				.displayName();
 		if (insufficient) {
 			// 데이터 부족은 200 응답을 유지하되 근거 없는 혼잡 관련 필드는 null로 두어 JSON에서 생략한다.
 			return new JourneyRouteResponse(
@@ -216,14 +219,8 @@ public class JourneyTestDataService {
 		));
 	}
 
-	private StopEntity getStop(String stopId) {
-		return stopRepository.findById(stopId)
-				.orElseThrow(() -> new ApiException(ErrorCode.STOP_NOT_FOUND));
-	}
-
 	private static String direction(RouteEntity route) {
-		// 실제 승강장 방향 데이터가 없어 현재는 노선 종점명을 임시 방향 문구로 사용한다.
-		return route.getEndStopName() == null ? null : route.getEndStopName() + " 방면";
+		return RouteDirectionDescription.fromEndStopName(route.getEndStopName());
 	}
 
 	private static CongestionLevel congestionLevel(StandingBurdenLevel level) {

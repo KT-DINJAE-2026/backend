@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Journeys", description = "직통 버스 도착 및 입석 부담 예측")
 @RestController
-@RequestMapping(path = "/api/v1/journeys", produces = MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+@RequestMapping("/api/v1/journeys")
 public class JourneyPredictionController {
 
 	private final JourneyTestDataService testDataService;

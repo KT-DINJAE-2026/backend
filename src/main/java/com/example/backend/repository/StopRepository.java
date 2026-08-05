@@ -3,6 +3,8 @@ package com.example.backend.repository;
 import java.util.List;
 
 import com.example.backend.domain.StopEntity;
+import com.example.backend.error.ApiException;
+import com.example.backend.error.ErrorCode;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +14,12 @@ import org.springframework.data.repository.query.Param;
 
 /** 정류장명·ARS·노선 번호 검색과 출발지 이후 도달 가능한 정류장 조회를 담당한다. */
 public interface StopRepository extends JpaRepository<StopEntity, String> {
+
+	/** API에서 필수인 정류장을 조회하고 없으면 공통 정류장 오류를 반환한다. */
+	default StopEntity getRequired(String stopId) {
+		return findById(stopId)
+				.orElseThrow(() -> new ApiException(ErrorCode.STOP_NOT_FOUND));
+	}
 
 	/** 직통 여부와 무관하게 검색어가 일치하는 정류장을 반환한다. */
 	@Query("""

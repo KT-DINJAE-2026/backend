@@ -22,6 +22,7 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import com.example.backend.config.AppProperties;
+import com.example.backend.domain.BusVehicleType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,7 +239,7 @@ public class TopisArrivalClient implements ArrivalClient {
 				routeNumber,
 				direction,
 				vehicleNumber,
-				vehicleType(busTypeCode),
+				BusVehicleType.fromTopisCode(busTypeCode).displayName(),
 				"1".equals(busTypeCode),
 				arrivalSeconds,
 				toArrivalMinutes(arrivalSeconds),
@@ -287,14 +288,6 @@ public class TopisArrivalClient implements ArrivalClient {
 	private static int toArrivalMinutes(int seconds) {
 		// FE는 분 단위로 표시하므로 남은 초를 버리지 않고 올림한다.
 		return seconds <= 0 ? 0 : (seconds + 59) / 60;
-	}
-
-	private static String vehicleType(String code) {
-		return switch (code) {
-			case "1" -> "저상버스";
-			case "2" -> "굴절버스";
-			default -> "일반버스";
-		};
 	}
 
 	private static String validIdentifier(String value) {

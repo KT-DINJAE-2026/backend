@@ -14,7 +14,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Stops", description = "정류장 진입 정보와 직통 노선 검색")
 @Validated
 @RestController
-@RequestMapping(path = "/api/v1/stops", produces = MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
+@RequestMapping("/api/v1/stops")
 public class StopController {
 
 	private final StopService stopService;

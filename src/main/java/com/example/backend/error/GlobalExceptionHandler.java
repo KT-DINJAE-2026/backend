@@ -8,7 +8,6 @@ import com.example.backend.arrival.TopisApiException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -25,7 +24,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
 	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-	private static final MediaType JSON_UTF8 = MediaType.parseMediaType("application/json;charset=UTF-8");
 
 	@ExceptionHandler(ApiException.class)
 	public ResponseEntity<ApiErrorResponse> handleApiException(ApiException exception) {
@@ -87,7 +85,6 @@ public class GlobalExceptionHandler {
 			log.warn("traceId={} code={} message={}", traceId, errorCode.name(), exception.getMessage());
 		}
 		return ResponseEntity.status(errorCode.status())
-				.contentType(JSON_UTF8)
 				.body(new ApiErrorResponse(
 						errorCode.name(),
 						errorCode.message(),
