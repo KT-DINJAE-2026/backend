@@ -2,7 +2,9 @@ package com.example.backend.stop;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +15,7 @@ import com.example.backend.error.ApiException;
 import com.example.backend.error.ErrorCode;
 import com.example.backend.repository.RouteRepository;
 import com.example.backend.repository.StopRepository;
+import com.example.backend.repository.StopRouteProjection;
 import com.example.backend.stop.dto.CurrentStopResponse;
 import com.example.backend.stop.dto.DestinationStopResponse;
 import com.example.backend.stop.dto.LocationResponse;
@@ -65,13 +68,17 @@ public class StopService {
 			).getContent();
 		}
 
+		RouteLookup routeLookup = loadRoutes(currentStop.getId(), destinationStops, true);
 		List<DestinationStopResponse> destinations = destinationStops.stream()
-				.map(destination -> toDestination(currentStop, destination))
+				.map(destination -> toDestination(destination, routeLookup))
 				.toList();
 
 		return new StopContextResponse(
 				OffsetDateTime.now(clock),
-				toCurrentStop(currentStop, directionFor(currentStop.getId(), List.of())),
+				toCurrentStop(currentStop, directionFor(
+						List.of(),
+						routeLookup.servingRoutes().getOrDefault(currentStop.getId(), List.of())
+				)),
 				destinations
 		);
 	}
@@ -96,9 +103,12 @@ public class StopService {
 		// 노선 조인으로 같은 정류장이 중복될 수 있어 검색 순서를 유지한 채 표준 ID로 제거한다.
 		Map<String, StopEntity> uniqueCandidates = new LinkedHashMap<>();
 		candidates.forEach(stop -> uniqueCandidates.putIfAbsent(stop.getId(), stop));
-		List<DestinationStopResponse> destinations = uniqueCandidates.values().stream()
+		List<StopEntity> destinationStops = uniqueCandidates.values().stream()
 				.filter(stop -> !stop.getId().equals(originStopId))
-				.map(stop -> toDestination(originStop, stop))
+				.toList();
+		RouteLookup routeLookup = loadRoutes(originStop.getId(), destinationStops, false);
+		List<DestinationStopResponse> destinations = destinationStops.stream()
+				.map(stop -> toDestination(stop, routeLookup))
 				.toList();
 		return new StopSearchResponse(destinations);
 	}
@@ -133,12 +143,15 @@ public class StopService {
 		);
 	}
 
-	private DestinationStopResponse toDestination(StopEntity origin, StopEntity destination) {
-		List<RouteEntity> routes = routeRepository.findDirectRoutes(origin.getId(), destination.getId());
+	private DestinationStopResponse toDestination(StopEntity destination, RouteLookup routeLookup) {
+		List<RouteEntity> routes = routeLookup.directRoutes().getOrDefault(destination.getId(), List.of());
 		List<ServedRouteResponse> servedRoutes = routes.stream()
 				.map(route -> new ServedRouteResponse(route.getId(), route.getNumber()))
 				.toList();
-		String direction = directionFor(destination.getId(), routes);
+		String direction = directionFor(
+				routes,
+				routeLookup.servingRoutes().getOrDefault(destination.getId(), List.of())
+		);
 
 		return new DestinationStopResponse(
 				destination.getId(),
@@ -150,10 +163,10 @@ public class StopService {
 		);
 	}
 
-	private String directionFor(String stopId, List<RouteEntity> preferredRoutes) {
+	private String directionFor(List<RouteEntity> preferredRoutes, List<RouteEntity> fallbackRoutes) {
 		// 실제 승강장 방향 데이터가 없어 현재는 첫 번째 관련 노선의 종점명을 대표 방향으로 사용한다.
 		List<RouteEntity> routes = preferredRoutes.isEmpty()
-				? routeRepository.findRoutesServingStop(stopId)
+				? fallbackRoutes
 				: preferredRoutes;
 		return routes.stream()
 				.map(RouteEntity::getEndStopName)
@@ -163,11 +176,50 @@ public class StopService {
 				.orElse(null);
 	}
 
+	/** 후보 수와 관계없이 직통 노선과 경유 노선을 각각 한 번의 벌크 쿼리로 준비한다. */
+	private RouteLookup loadRoutes(
+			String originStopId,
+			List<StopEntity> destinationStops,
+			boolean includeOriginForDirection
+	) {
+		List<String> destinationIds = destinationStops.stream()
+				.map(StopEntity::getId)
+				.distinct()
+				.toList();
+		Map<String, List<RouteEntity>> directRoutes = destinationIds.isEmpty()
+				? Map.of()
+				: groupRoutes(routeRepository.findDirectRoutesForStops(originStopId, destinationIds));
+
+		LinkedHashSet<String> servingStopIds = new LinkedHashSet<>(destinationIds);
+		if (includeOriginForDirection) {
+			servingStopIds.add(originStopId);
+		}
+		Map<String, List<RouteEntity>> servingRoutes = servingStopIds.isEmpty()
+				? Map.of()
+				: groupRoutes(routeRepository.findRoutesServingStops(List.copyOf(servingStopIds)));
+		return new RouteLookup(directRoutes, servingRoutes);
+	}
+
+	private Map<String, List<RouteEntity>> groupRoutes(List<StopRouteProjection> rows) {
+		Map<String, List<RouteEntity>> groupedRoutes = new LinkedHashMap<>();
+		for (StopRouteProjection row : rows) {
+			groupedRoutes.computeIfAbsent(row.getStopId(), ignored -> new ArrayList<>())
+					.add(row.getRoute());
+		}
+		return groupedRoutes;
+	}
+
 	private LocationResponse toLocation(StopEntity stop) {
 		if (stop.getLatitude() == null || stop.getLongitude() == null) {
 			// 원천 기반정보에 좌표가 없으면 불완전한 location 객체 대신 필드 전체를 생략한다.
 			return null;
 		}
 		return new LocationResponse(stop.getLatitude(), stop.getLongitude());
+	}
+
+	private record RouteLookup(
+			Map<String, List<RouteEntity>> directRoutes,
+			Map<String, List<RouteEntity>> servingRoutes
+	) {
 	}
 }

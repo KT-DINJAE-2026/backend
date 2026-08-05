@@ -102,6 +102,7 @@ backend/
 | 설정 | 기본값 | 설명 |
 |---|---|---|
 | `app.api.initial-destination-stop-ids` | `107000089`, `100000147` | `/stops/{stopId}/context`가 초기 도착 정류장으로 내려줄 ID 목록 |
+| `app.cors.allowed-origins` | `http://localhost:5173`, 정식 Vercel 주소 | 브라우저의 `/api/**` 접근을 허용할 Origin 목록. 프로필 YAML에서 재정의 가능 |
 | `app.master-data.import-enabled` | `false` | 기반정보 적재 실행 여부 |
 | `app.master-data.city-name` | `서울특별시` | 적재 대상 시도 |
 | `app.master-data.stop-file` / `route-file` / `route-stop-file` | 환경 변수 | 적재할 DAT 경로 |
@@ -143,21 +144,34 @@ Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 �
 | HTTP status | `code` | 사용 상황 |
 |---|---|---|
 | `400` | `INVALID_REQUEST` | 필수값 누락, 잘못된 ID 형식 |
+| `404` | `RESOURCE_NOT_FOUND` | 존재하지 않는 API 경로 |
 | `404` | `STOP_NOT_FOUND` | 출발 또는 도착 정류장 없음 |
 | `404` | `NO_DIRECT_ROUTE` | 두 정류장을 한 번에 잇는 버스 없음 |
+| `405` | `METHOD_NOT_ALLOWED` | 엔드포인트가 허용하지 않는 HTTP method |
 | `409` | `STOP_DIRECTION_MISMATCH` | 정류장은 있지만 선택 방향으로 이동 불가 |
+| `415` | `UNSUPPORTED_MEDIA_TYPE` | 지원하지 않는 `Content-Type` |
+| `502` | `UPSTREAM_FAILURE` | TOPIS 통신 실패 또는 잘못된 응답 |
+| `503` | `UPSTREAM_UNAVAILABLE` | TOPIS 인증 또는 서버 설정 문제 |
 | `500` | `INTERNAL_SERVER_ERROR` | 서버 처리 실패 |
 
 혼잡도 데이터 부족은 오류가 아니라 `200` 응답의 `status: "INSUFFICIENT_DATA"`로 구분합니다.
 
 ### CORS
 
-[CorsConfig](src/main/java/com/example/backend/config/CorsConfig.java)에서 `/api/**` 경로에 아래 Origin의 `GET`, `POST`, `OPTIONS` 요청을 허용합니다. 허용 헤더는 `Accept`, `Content-Type`입니다.
+[CorsConfig](src/main/java/com/example/backend/config/CorsConfig.java)에서 `/api/**` 경로에 `app.cors.allowed-origins`로 설정한 Origin의 `GET`, `POST`, `OPTIONS` 요청을 허용합니다. 허용 헤더는 `Accept`, `Content-Type`입니다. 기본값은 아래 두 주소입니다.
 
 - `http://localhost:5173`
 - `https://kd-dinjae-2026-fe.vercel.app`
 
-정식 Vercel 주소는 등록되어 있지만 Preview URL은 허용되지 않습니다. Preview 또는 추가 배포 도메인을 사용하면 이 목록도 함께 갱신해야 합니다.
+정식 Vercel 주소는 등록되어 있지만 Preview URL은 허용되지 않습니다. Preview 또는 추가 배포 도메인을 사용하면 활성 프로필의 `application-{profile}.yaml`이나 외부 설정 파일에서 목록을 재정의한 뒤 서버를 재시작하세요. Java 코드를 바꾸거나 재빌드할 필요는 없습니다.
+
+```yaml
+app:
+  cors:
+    allowed-origins:
+      - "https://preview.example.com"
+      - "https://kd-dinjae-2026-fe.vercel.app"
+```
 
 ### FE 연결용 demo 프로필
 

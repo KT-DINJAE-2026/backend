@@ -40,6 +40,8 @@ public class TopisArrivalService {
 
 		CacheKey key = new CacheKey(stopId, routeId, stopOrder);
 		Instant now = clock.instant();
+		// 새 키를 조회할 때마다 만료 항목을 함께 제거해 조회 조합이 늘어도 메모리가 누적되지 않게 한다.
+		cache.entrySet().removeIf(entry -> !entry.getValue().expiresAt().isAfter(now));
 		// compute를 사용해 동일 키의 동시 요청도 외부 호출 한 번으로 합친다.
 		CacheEntry entry = cache.compute(key, (ignored, current) -> {
 			if (current != null && current.expiresAt().isAfter(now)) {
@@ -49,6 +51,11 @@ public class TopisArrivalService {
 			return new CacheEntry(result, now.plus(cacheTtl));
 		});
 		return entry.result();
+	}
+
+	/** 캐시 정리 동작을 외부 구현 세부사항 노출 없이 같은 패키지의 테스트에서 검증한다. */
+	int cachedEntryCount() {
+		return cache.size();
 	}
 
 	private record CacheKey(String stopId, String routeId, int stopOrder) {

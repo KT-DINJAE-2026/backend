@@ -112,12 +112,20 @@ VITE_API_BASE_URL=http://localhost:8080
 
 ### CORS
 
-`/api/**` 경로에 아래 Origin의 `GET`, `POST`, `OPTIONS`를 허용합니다. 허용 헤더는 `Accept`, `Content-Type`입니다.
+`/api/**` 경로에 `app.cors.allowed-origins`로 설정한 Origin의 `GET`, `POST`, `OPTIONS`를 허용합니다. 허용 헤더는 `Accept`, `Content-Type`이며 기본 Origin은 아래 두 주소입니다.
 
 - `http://localhost:5173`
 - `https://kd-dinjae-2026-fe.vercel.app`
 
-정식 Vercel 주소는 이미 등록되어 있습니다. Vercel Preview URL이나 추가 배포 도메인을 사용할 경우 해당 Origin을 별도로 공유해 주세요. 현재 Preview URL은 CORS 허용 대상이 아닙니다.
+정식 Vercel 주소는 이미 등록되어 있습니다. Vercel Preview URL이나 추가 배포 도메인을 사용할 경우 해당 Origin을 별도로 공유해 주세요. 활성 프로필의 `application-{profile}.yaml` 또는 외부 설정 파일에서 다음처럼 목록을 재정의하고 서버를 재시작하면 되며, 백엔드 재빌드는 필요하지 않습니다.
+
+```yaml
+app:
+  cors:
+    allowed-origins:
+      - "https://preview.example.com"
+      - "https://kd-dinjae-2026-fe.vercel.app"
+```
 
 ---
 
@@ -329,10 +337,15 @@ GET /api/v1/stops/search?originStopId=107000087&query=%EB%B3%B4%EB%AC%B8%EC%97%A
 
 | HTTP | `code` | 상황 |
 |---|---|---|
-| `400` | `INVALID_REQUEST` | 필수값 누락, ID 형식 오류(9자리 아님) |
+| `400` | `INVALID_REQUEST` | 필수값 누락, ID 형식 오류(9자리 아님), 파라미터 타입 불일치 |
+| `404` | `RESOURCE_NOT_FOUND` | 존재하지 않는 API 경로 |
 | `404` | `STOP_NOT_FOUND` | 출발 또는 도착 정류장 없음 |
 | `404` | `NO_DIRECT_ROUTE` | 두 정류장을 잇는 직통 버스 없음 |
+| `405` | `METHOD_NOT_ALLOWED` | 엔드포인트가 허용하지 않는 HTTP method |
 | `409` | `STOP_DIRECTION_MISMATCH` | 노선은 지나지만 그 방향으로는 이동 불가 |
+| `415` | `UNSUPPORTED_MEDIA_TYPE` | 지원하지 않는 `Content-Type` |
+| `502` | `UPSTREAM_FAILURE` | TOPIS 통신 실패 또는 해석할 수 없는 응답 |
+| `503` | `UPSTREAM_UNAVAILABLE` | TOPIS 인증 실패 또는 서버 설정 누락 |
 | `500` | `INTERNAL_SERVER_ERROR` | 서버 처리 실패 |
 
 `message`는 사용자 안내에 쓰지 말고 로그 확인용으로만 쓰세요. `traceId`로 서버 로그와 대조할 수 있습니다.
@@ -439,7 +452,8 @@ FE 저장소의 `README.md`, `docs/API_CONTRACT_DRAFT.md`, `design/figma-import/
 | 데이터 부족 시 도착·이동시간 유지, 혼잡 필드 생략 | `200 INSUFFICIENT_DATA` 응답 | 완료 |
 | 차량 단위 `tripId`, 구간 순서·연속성·시간 합계 | 실제 노선 순서를 사용해 응답을 생성 | 테스트 응답 기준 완료 |
 | 잘못된 ID, 없는 정류장, 역방향, 직통 없음 오류 body | `code`, `message`, `traceId` 제공 | 핵심 흐름 완료 |
-| 로컬·정식 Vercel CORS | 지정된 두 Origin의 `GET`, `POST`, `OPTIONS` 허용 | 완료 |
+| 잘못된 경로·method·Content-Type·파라미터 타입의 HTTP 상태 | 각각 `404`, `405`, `415`, `400`과 공통 오류 body 제공 | 완료 |
+| 로컬·정식 Vercel CORS | `app.cors.allowed-origins`의 Origin에 `GET`, `POST`, `OPTIONS` 허용 | 완료 |
 | 로드뷰 | 백엔드는 WGS84 좌표만 제공하고 카카오 로드뷰는 FE가 처리 | 역할 범위 충족 |
 
 따라서 **실시간 도착정보와 AI 예측을 제외한 현재 화면 연동은 demo 프로필로 진행할 수 있습니다.** QR 이미지 생성, 카카오 로드뷰 호출, enum의 사용자 표시 문구, 화면 정렬과 상태 컴포넌트는 FE 담당이며 백엔드 미구현으로 보지 않습니다.
@@ -455,8 +469,7 @@ FE 저장소의 `README.md`, `docs/API_CONTRACT_DRAFT.md`, `design/figma-import/
 | 운영 전 확인 | 검색 가능한 모든 정류장의 `arsId`, `location`, 방향 필수값 보장 | 현재 DB 모델은 ARS·좌표·노선 종점명을 nullable로 허용하므로 운영 데이터 누락 시 응답에서도 필드가 빠질 수 있음 |
 | 연동 배포 전 | FE가 접근할 HTTPS 백엔드 주소 배포 및 환경변수 공유 | 현재는 로컬 `http://localhost:8080` 연결만 안내 |
 | 문서 보완 | Swagger 404 응답에 `NO_DIRECT_ROUTE` JSON 예시 추가 | JSON 자체는 3.3절에서 확인 가능 |
-| 안정성 보완 | 존재하지 않는 API 경로, 허용하지 않은 HTTP method, 잘못된 `Content-Type`을 각각 404·405·415로 반환 | 현재 전역 예외 처리에 걸리면 500이 될 수 있음. 정상 FE 요청에는 영향 없음 |
-| 배포 방식 확정 후 | Vercel Preview URL을 쓸 경우 CORS 허용 정책 추가 | 정식 Vercel URL과 로컬 URL은 이미 허용 |
+| 배포 방식 확정 후 | Vercel Preview URL을 쓸 경우 `app.cors.allowed-origins`에 Origin 추가 | 정식 Vercel URL과 로컬 URL은 기본값으로 허용 |
 
 TOPIS 클라이언트와 20초 캐시는 구현되어 있지만 현재 `JourneyTestDataService`가 이를 호출하지 않습니다. 따라서 “도착시간 갱신 주기와 캐시 기준”은 코드에 준비되어 있을 뿐 실제 여정 응답에 적용됐다고 보지 않습니다.
 

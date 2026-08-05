@@ -7,6 +7,11 @@ spring:
     default: local
 
 app:
+  # CORS Origin은 프로필 YAML에서 이 목록을 재정의할 수 있다.
+  cors:
+    allowed-origins:
+      - "http://localhost:5173"
+      - "https://kd-dinjae-2026-fe.vercel.app"
   demo:
     enabled: false
   api:

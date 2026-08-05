@@ -19,6 +19,7 @@ public class AppProperties {
 	private final MasterData masterData = new MasterData();
 	private final Topis topis = new Topis();
 	private final Demo demo = new Demo();
+	private final Cors cors = new Cors();
 
 	public Api getApi() {
 		return api;
@@ -34,6 +35,10 @@ public class AppProperties {
 
 	public Demo getDemo() {
 		return demo;
+	}
+
+	public Cors getCors() {
+		return cors;
 	}
 
 	/** QR 진입 직후 보여줄 초기 목적지 목록 등 API 동작 설정. */
@@ -170,6 +175,23 @@ public class AppProperties {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+	}
+
+	/** FE가 API에 접근할 수 있는 브라우저 Origin 목록. */
+	public static class Cors {
+
+		private List<String> allowedOrigins = new ArrayList<>(List.of(
+				"http://localhost:5173",
+				"https://kd-dinjae-2026-fe.vercel.app"
+		));
+
+		public List<String> getAllowedOrigins() {
+			return allowedOrigins;
+		}
+
+		public void setAllowedOrigins(List<String> allowedOrigins) {
+			this.allowedOrigins = allowedOrigins;
 		}
 	}
 }

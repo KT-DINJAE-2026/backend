@@ -103,6 +103,33 @@ class DemoApiContractTests {
 	}
 
 	@Test
+	void frameworkErrorsUseTheFrontendErrorContract() throws Exception {
+		HttpResponse<String> missingPath = get("/api/v1/not-found");
+		assertError(missingPath, 404, "RESOURCE_NOT_FOUND");
+
+		HttpRequest wrongMethodRequest = HttpRequest.newBuilder(uri("/api/v1/journeys/predictions"))
+				.header("Accept", "application/json")
+				.DELETE()
+				.build();
+		HttpResponse<String> wrongMethod = httpClient.send(
+				wrongMethodRequest,
+				HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+		);
+		assertError(wrongMethod, 405, "METHOD_NOT_ALLOWED");
+
+		HttpRequest wrongContentTypeRequest = HttpRequest.newBuilder(uri("/api/v1/journeys/predictions"))
+				.header("Accept", "application/json")
+				.header("Content-Type", "text/plain")
+				.POST(HttpRequest.BodyPublishers.ofString("not-json"))
+				.build();
+		HttpResponse<String> wrongContentType = httpClient.send(
+				wrongContentTypeRequest,
+				HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+		);
+		assertError(wrongContentType, 415, "UNSUPPORTED_MEDIA_TYPE");
+	}
+
+	@Test
 	void corsAllowsTheLocalFrontendOrigin() throws Exception {
 		HttpRequest request = HttpRequest.newBuilder(uri("/api/v1/journeys/predictions"))
 				.header("Origin", "http://localhost:5173")
@@ -150,6 +177,14 @@ class DemoApiContractTests {
 
 	private URI uri(String path) {
 		return URI.create("http://127.0.0.1:" + port + path);
+	}
+
+	private void assertError(HttpResponse<String> response, int status, String code) {
+		assertThat(response.statusCode()).isEqualTo(status);
+		assertThat(response.body())
+				.contains("\"code\":\"" + code + "\"")
+				.contains("\"message\"")
+				.contains("\"traceId\"");
 	}
 
 	@TestConfiguration

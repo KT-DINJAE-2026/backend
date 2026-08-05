@@ -40,6 +40,26 @@ class TopisArrivalServiceTests {
 		assertThat(calls).hasValue(2);
 	}
 
+	@Test
+	void removesExpiredEntriesWhenAnotherKeyIsRequested() {
+		MutableClock clock = new MutableClock(Instant.parse("2026-08-03T03:00:00Z"));
+		ArrivalClient client = (stopId, routeId, stopOrder) -> ArrivalLookupResult.empty(
+				ArrivalLookupStatus.NO_ARRIVAL,
+				OffsetDateTime.now(clock)
+		);
+		AppProperties properties = new AppProperties();
+		properties.getTopis().setCacheTtl(Duration.ofSeconds(20));
+		TopisArrivalService service = new TopisArrivalService(client, properties, clock);
+
+		service.getArrivals("121000019", "100100027", 35);
+		assertThat(service.cachedEntryCount()).isEqualTo(1);
+
+		clock.advance(Duration.ofSeconds(21));
+		service.getArrivals("121000021", "100100028", 36);
+
+		assertThat(service.cachedEntryCount()).isEqualTo(1);
+	}
+
 	/** 실제 대기 없이 캐시 만료 시각을 전진시키기 위한 테스트 전용 Clock이다. */
 	private static final class MutableClock extends Clock {
 
