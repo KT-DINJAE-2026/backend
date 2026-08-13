@@ -63,8 +63,7 @@ Windows 한글 경로에서 전체 빌드를 실행할 때도 같은 우회 옵�
 backend/
 ├── build.gradle          # 의존성·빌드 설정
 ├── compose.yaml          # 로컬 개발용 MySQL 컨테이너 정의
-├── docs/
-│   └── FRONTEND_INTEGRATION.md           # 프론트엔드 API 연동 가이드
+├── docs/                 # 협업·설계 문서
 ├── src
 │   ├── main
 │   │   ├── java/com/example/backend/
@@ -137,9 +136,7 @@ H2 프로필의 데이터 파일은 `.local/backend-smoke.mv.db`에 생성되며
 
 `stopId`, `originStopId`, `destinationStopId`는 숫자 9자리, `query`는 1~50자입니다. 검색 결과가 없으면 `200`과 함께 `destinationStops`가 빈 배열로 반환됩니다. 직통 노선이 없는 정류장도 검색 결과에서 숨기지 않고 `servedRoutes: []`로 내려주며, 그 정류장으로 여정 예측을 요청했을 때 `404 NO_DIRECT_ROUTE`가 반환됩니다.
 
-Swagger UI는 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있습니다. API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
-
-프론트 연결 절차, 실제 JSON 예시, Mock 계약 대비 변경 사항은 [프론트엔드 연동 가이드](docs/FRONTEND_INTEGRATION.md)를 참고하세요.
+FE 연동 API 계약의 기준은 서버 실행 후 `http://localhost:8080/swagger-ui.html`에서 확인할 수 있는 Swagger 스키마와 예시입니다. 실행 방법과 환경 설정은 이 README를 따르며, API 오류는 `code`, `message`, `traceId` 형식으로 반환합니다.
 
 | HTTP status | `code` | 사용 상황 |
 |---|---|---|
@@ -226,6 +223,23 @@ Docker/MySQL 없이 H2 스모크 DB에 적재할 때는 마지막 명령에 H2 �
 적재 테이블은 `stop`, `route`, `route_stop`입니다. 국토부 표준 `stopId`와 `routeId`를 기본 키로 사용합니다. 원천 로컬 ID는 제공기관 코드와 합쳐서 매핑하므로 서로 다른 기관이 같은 로컬 ID를 사용해도 충돌하지 않습니다. 기본 적재 범위는 `서울특별시`이며 `app.master-data.city-name`으로 바꿀 수 있습니다.
 
 `route_stop.stop_order`로 출발 정류장보다 뒤에 있는 도착 정류장만 직통으로 판정합니다. 순환 노선에서 동일 정류장이 여러 번 등장해도 정방향 순서 쌍이 존재하면 직통으로 처리합니다.
+
+## 성북구 학습 데이터 전처리
+
+`D:\20250328_KDATA`의 헤더가 있는 18컬럼 `METROPOLITAN` TCD는 원본 ZIP을 변경하거나 압축 해제하지 않고 일자별로 처리합니다. `STTN`의 법정동코드와 `ROUTESTTN`을 이용해 성북구 정류장을 경유하는 버스 노선을 찾고, 재차인원 복원을 위해 그 노선의 전체 승객을 포함합니다.
+
+```powershell
+python data-pipeline\build_metropolitan_roster.py `
+  "D:\20250328_KDATA\DATA_20240401.zip" `
+  "C:\bus-standing-work\pilot\roster_20240401.parquet" `
+  --standard-id-zip "D:\20250313_KDATA\DATA_20240401.zip" `
+  --exclude-unmapped-standard-ids `
+  --with-weather
+```
+
+대용량 결과는 Git·OneDrive 경로 밖에 저장합니다. 18컬럼 자료에 없는 표준 ID는 같은 날짜의 27컬럼 TCD를 읽어 엄격히 매핑하며, 누락이나 충돌이 있으면 생성을 중단합니다. `--with-weather`는 STTN 좌표를 기준으로 Open-Meteo 과거 시간별 날씨를 연결하고 로컬 캐시를 재사용합니다. 전체 사용법, 파일럿 통계와 남은 작업은 [KDATA METROPOLITAN TCD 전처리](data-pipeline/docs/METROPOLITAN_TCD_PIPELINE.md)를 참고합니다.
+
+여러 날짜를 생성한 뒤에는 `finalize_metropolitan_dataset.py`로 일별 표본 수를 전체 학습기간 기준으로 다시 계산합니다. 이 후처리기는 전체 파일을 메모리에 합치지 않고 입력과 다른 디렉터리에 최종 Parquet을 생성합니다.
 
 ## 여정 테스트 데이터
 

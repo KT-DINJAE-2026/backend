@@ -25,6 +25,7 @@ import random
 import sys
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pyarrow as pa
@@ -133,7 +134,13 @@ def load_stop_sequences(routesttn_path):
 
 
 def assign_trip_rounds(df, seq_map):
-    """차량별 승차태그를 시간순으로 훑으며 정류장 순번 역행 지점에서 회차를 나눈다."""
+    """차량별 승차태그를 시간순으로 훑으며 추정 운행회차를 부여한다.
+
+    원본의 운행출발일시는 일부 차량에서 하루 종일 같은 값으로 기록되어 회차 경계로
+    사용할 수 없다. 따라서 같은 차량·노선 안에서 정류장 순번이 기점 방향으로 크게
+    역행하거나, 마지막 승차 태그 이후 60분 이상 공백이 생긴 지점을 새 회차로 본다.
+    ``trip_round_id``는 실측 운행 ID가 아니라 이 규칙으로 만든 재현 가능한 그룹 키다.
+    """
     df = df.sort_values(["vehicle_id", "board_dt"], kind="stable")
     seqs = [
         seq_map.get((r, s))
@@ -222,9 +229,13 @@ def simulate_fifo(df):
 
 
 def compute_headway(df):
-    """같은 (노선, 정류장)의 직전 차량과의 도착 간격(초). 첫차는 NULL.
+    """같은 (노선, 정류장)의 직전 *관측 회차*와의 태그 간격(초)을 계산한다.
 
-    차량의 정류장 도착시각 = 해당 운행회차가 그 정류장에서 받은 첫 승차 태그.
+    실제 버스 도착시각이 없으므로 해당 운행회차가 정류장에서 받은 첫 승차 태그를
+    도착시각 대용값으로 사용한다. 승차자가 없던 차량은 관측되지 않기 때문에 이 값은
+    실제 배차간격이 아니며 승객 수요의 영향을 받는다. 운영 시 동일하게 재현할 수 없는
+    근사값이므로 모델 피처로 사용하려면 별도의 공식 배차 자료로 교체해야 한다.
+    각 (노선, 정류장)의 첫 관측 회차는 직전 값이 없어 NULL이다.
     """
     arrivals = (
         df.groupby(["route_id", "board_stop_id", "trip_round_id"], sort=False)["board_dt"]
@@ -238,20 +249,27 @@ def compute_headway(df):
     return arrivals.set_index(["route_id", "board_stop_id", "trip_round_id"])["headway_sec"]
 
 
-def build(tcd_path, routesttn_path, out_path, sttn_path=None,
-          seq_map=None, stop_coords=None):
-    """단일 TCD 파일 → 명부 parquet. seq_map/stop_coords를 주면 재로드 생략(배치용)."""
+def build_loaded(df, seq_map, out_path, sttn_path=None, stop_coords=None,
+                 n_bad_alight=0, output_row_mask=None):
+    """표준 컬럼으로 정규화한 TCD DataFrame → 명부 parquet.
+
+    원본 포맷별 로더는 아래 컬럼을 만들어 이 함수에 넘긴다. 이렇게 하면 50필드
+    원본과 헤더가 있는 축약본이 동일한 회차 분리·FIFO·출력 계약을 사용한다.
+
+    ``card_id``, ``board_dt``, ``alight_dt``, ``vehicle_id``, ``route_id``,
+    ``route_settle_id``, ``board_stop_id``, ``board_stop_settle_id``,
+    ``alight_stop_id``, ``usertype_code``, ``bus_type_code``
+    """
     t0 = datetime.now()
-    df, n_bad_alight = load_tcd(tcd_path)
     print(f"화이트리스트 행: {len(df):,} (하차<승차 이상치 {n_bad_alight}건은 미태그 처리)")
 
-    if seq_map is None:
-        seq_map = load_stop_sequences(routesttn_path)
     df, n_unmapped = assign_trip_rounds(df, seq_map)
     n_rounds = df["trip_round_id"].nunique()
     print(f"정류장 순번 매핑: {len(seq_map):,}개 (노선,정류장) / 순번 미매핑 태그 {n_unmapped:,}건")
     print(f"운행회차: {n_rounds:,}개 (차량 {df['vehicle_id'].nunique():,}대)")
 
+    # 표준 ID가 없는 승객도 여기까지는 남겨야 실제 재차인원과 좌석 경쟁에 미친
+    # 영향을 보존할 수 있다. 학습 불가능 행 제거는 FIFO와 headway 계산 뒤에 수행한다.
     labels = simulate_fifo(df)
     df["is_standing"] = df.index.map(lambda i: labels[i][0])
     df["standing_seconds"] = df.index.map(lambda i: labels[i][1])
@@ -261,6 +279,20 @@ def build(tcd_path, routesttn_path, out_path, sttn_path=None,
         headway.rename("headway_sec"),
         on=["route_id", "board_stop_id", "trip_round_id"],
     )
+
+    excluded_output_rows = 0
+    if output_row_mask is not None:
+        # 이 마스크는 표준 ID 계약을 만족하는 학습 행만 뜻한다. 시뮬레이션 전에
+        # 적용하면 누락 승객만큼 좌석이 비어 입석 레이블이 달라지므로 순서를 바꾸지 않는다.
+        keep = output_row_mask.reindex(df.index, fill_value=False).astype(bool)
+        excluded_output_rows = int((~keep).sum())
+        df = df.loc[keep].copy()
+        print(
+            f"학습 출력 제외: {excluded_output_rows:,}행 "
+            "(표준 ID 없는 미정차·비표준 정류장)"
+        )
+        if df.empty:
+            raise ValueError("표준 ID 검증 후 학습 출력에 남는 행이 없음")
 
     df["board_date"] = df["board_dt"].dt.strftime("%Y-%m-%d")
     df["weekday"] = df["board_dt"].dt.dayofweek.map(lambda d: WEEKDAYS[d])
@@ -275,7 +307,9 @@ def build(tcd_path, routesttn_path, out_path, sttn_path=None,
     df["seat_capacity"] = df["bus_type_code"].map(lambda c: BUS_TYPES[c][1])
     df["usertype_name"] = df["usertype_code"].map(USERTYPE_NAMES)
 
-    # (노선, 구간=승하차 OD쌍, 시간대) 표본 수
+    # 일일 파일 생성 단계에서는 하루 안의 표본 수다. 여러 날짜를 학습할 때는
+    # finalize_metropolitan_dataset.py로 전체 학습기간 기준 값을 다시 써야 한다.
+    # 모델 입력보다는 표본 부족/신뢰도 판정용 메타 피처로 사용하는 값이다.
     df["sample_count_route_segment_hour"] = df.groupby(
         ["route_id", "board_stop_id", "alight_stop_id", "hour"]
     )["card_id"].transform("size")
@@ -323,6 +357,7 @@ def build(tcd_path, routesttn_path, out_path, sttn_path=None,
         ("sample_count_route_segment_hour", pa.int64()),
     ])
     table = pa.Table.from_pandas(out, schema=schema, preserve_index=False)
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(table, out_path, compression="zstd")
 
     n_stand = (out["is_standing"] == "Y").sum()
@@ -332,6 +367,34 @@ def build(tcd_path, routesttn_path, out_path, sttn_path=None,
     print(f"standing_seconds NULL(입석+하차미태그): {n_null_secs:,}")
     print(f"headway NULL(첫차): {out['headway_sec'].isna().sum():,}")
     print(f"소요: {(datetime.now() - t0).total_seconds():.0f}초")
+    return {
+        "rows": len(out),
+        "routes": int(df["route_id"].nunique()),
+        "trip_rounds": n_rounds,
+        "vehicles": int(df["vehicle_id"].nunique()),
+        "unmapped_stop_tags": n_unmapped,
+        "standing_rows": int(n_stand),
+        "standing_seconds_null_rows": int(n_null_secs),
+        "headway_null_rows": int(out["headway_sec"].isna().sum()),
+        "weather_null_rows": int(out["weather"].isna().sum()),
+        "excluded_output_rows": excluded_output_rows,
+    }
+
+
+def build(tcd_path, routesttn_path, out_path, sttn_path=None,
+          seq_map=None, stop_coords=None):
+    """단일 50필드 TCD 파일 → 명부 parquet. 캐시 값을 주면 마스터 재로드를 생략한다."""
+    df, n_bad_alight = load_tcd(tcd_path)
+    if seq_map is None:
+        seq_map = load_stop_sequences(routesttn_path)
+    return build_loaded(
+        df,
+        seq_map,
+        out_path,
+        sttn_path=sttn_path,
+        stop_coords=stop_coords,
+        n_bad_alight=n_bad_alight,
+    )
 
 
 if __name__ == "__main__":
