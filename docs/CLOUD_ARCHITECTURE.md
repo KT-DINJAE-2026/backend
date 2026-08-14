@@ -169,3 +169,69 @@ gcloud run deploy backend \
 띄우는 방법도 있다. 구성 요소가 하나뿐이라 이해하기 쉽고 로컬 개발 환경과 완전히 동일하다는
 장점이 있으나, HTTPS를 직접 구성해야 하고(Caddy/nginx + Let's Encrypt) VM 관리 부담이 생긴다.
 Cloud Run 방식에 문제가 생겼을 때의 대비책으로만 남겨둔다.
+
+## 7. 부록 — 필요 리소스·기술 정리
+
+### 생성해야 할 GCP 리소스
+
+| # | 리소스 | 권장 사양·설정 | 역할 |
+|---|---|---|---|
+| 1 | GCP 프로젝트 + 결제 계정 | 신규 계정 $300 크레딧 활성화, 리전은 전부 `asia-northeast3` | 모든 리소스의 컨테이너 |
+| 2 | Cloud Run 서비스 `backend` | 1 vCPU / **메모리 1GiB**, min 0(시연일 1) / max 2, 포트 8080, 미인증 호출 허용 | Spring Boot 백엔드 실행 |
+| 3 | Cloud SQL 인스턴스 | **MySQL 8.4**(로컬 compose와 동일), 공유 코어 최소 사양(db-f1-micro급), SSD 10GiB, 데이터베이스 1개 + 앱 전용 계정 | 정류장·노선 기반정보 저장 |
+| 4 | Artifact Registry 저장소 | Docker 형식, `asia-northeast3` | 백엔드 이미지 저장 |
+| 5 | Secret Manager 시크릿 | `db-password`, `topis-api-key` 2건 | 민감 정보를 코드·이미지 밖으로 분리 |
+| 6 | Cloud Run Job `backend-init` | 서비스와 같은 이미지, `app.master-data.import-enabled=true`로 실행 | 최초 1회 스키마 생성·기반정보 적재 |
+| 7 | 런타임 서비스 계정 | 역할: `roles/cloudsql.client`, `roles/secretmanager.secretAccessor` | Cloud Run이 DB·시크릿에 접근할 권한 |
+
+메모리는 1GiB를 권장한다. JVM 기본 설정에서 512MiB는 기동 중 OOM으로 죽는 경우가 흔하다.
+
+프로젝트에서 활성화할 API (콘솔에서 켜거나 `gcloud services enable`):
+
+```
+run.googleapis.com            # Cloud Run
+sqladmin.googleapis.com       # Cloud SQL
+artifactregistry.googleapis.com
+secretmanager.googleapis.com
+cloudbuild.googleapis.com     # gcloud builds submit 사용 시
+```
+
+### 코드 쪽에서 준비할 것
+
+**Dockerfile (신규 작성 필요).** 멀티 스테이지로 Gradle 빌드 후 JRE 21 이미지에 JAR와
+PMML 모델을 담는다.
+
+```dockerfile
+FROM gradle:8-jdk21 AS build
+WORKDIR /app
+COPY . .
+RUN gradle bootJar --no-daemon
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar app.jar
+COPY models/ /models/
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+**Cloud SQL 소켓 팩토리 의존성 (build.gradle에 추가).** Cloud Run은 `--add-cloudsql-instances`로
+연결한 인스턴스를 유닉스 소켓으로 노출하는데, MySQL 드라이버가 이를 쓰려면 커넥터 라이브러리가 필요하다.
+
+```gradle
+implementation 'com.google.cloud.sql:mysql-socket-factory-connector-j-8:1.21.0'
+```
+
+이때 `DB_URL` 환경변수는 다음 형식이 된다.
+
+```
+jdbc:mysql:///mydatabase?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory
+```
+
+### 팀이 익혀야 할 도구
+
+| 도구 | 용도 | 학습 부담 |
+|---|---|---|
+| `gcloud` CLI | 빌드 제출, Cloud Run 배포, 시크릿 등록 | 낮음 — 문서의 명령 예시로 충분 |
+| Docker / Dockerfile | 이미지 빌드 (로컬 검증용) | 낮음 — compose 경험 보유 |
+| Cloud 콘솔 | Cloud SQL 생성, 로그 확인(Cloud Logging) | 낮음 |
+| GitHub Actions (선택) | `main` 머지 시 자동 배포 | 중간 — 수동 배포로 시작 권장 |
