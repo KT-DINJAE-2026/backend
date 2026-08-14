@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-test:
+    name: Backend (Gradle test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 테스트는 H2를 사용하므로 Docker/MySQL 없이 실행 가능 (spring-boot-docker-compose는 테스트에서 자동 비활성화)
+      - name: Run tests
+        run: ./gradlew test
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: build/reports/tests/test
+
+  pipeline-test:
+    name: Data pipeline (unittest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: data-pipeline/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s data-pipeline/tests -p 'test_*.py' -v
