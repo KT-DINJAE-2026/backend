@@ -16,13 +16,13 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import com.example.backend.config.AppProperties;
 import com.example.backend.domain.BusVehicleType;
+import com.example.backend.publicdata.PublicDataServiceKeyEncoder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,9 +45,6 @@ public class TopisArrivalClient implements ArrivalClient {
 
 	private static final Logger log = LoggerFactory.getLogger(TopisArrivalClient.class);
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
-	private static final Pattern ENCODED_SERVICE_KEY = Pattern.compile(
-			"(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+"
-	);
 	private static final DateTimeFormatter PROVIDED_AT_FORMAT = new DateTimeFormatterBuilder()
 			.appendPattern("yyyy-MM-dd HH:mm:ss")
 			.optionalStart()
@@ -315,16 +312,13 @@ public class TopisArrivalClient implements ArrivalClient {
 	}
 
 	private static String encodeServiceKey(String value) {
-		if (!value.contains("%")) {
-			return encode(value);
-		}
-		// 이미 Encoding된 키를 다시 인코딩하면 %2B가 %252B로 바뀌어 인증에 실패한다.
-		if (!ENCODED_SERVICE_KEY.matcher(value).matches()) {
+		try {
+			return PublicDataServiceKeyEncoder.encode(value);
+		} catch (IllegalArgumentException exception) {
 			throw new TopisApiException(
 					TopisApiException.Reason.CONFIGURATION,
 					"서울시 버스 API Encoding 인증키 형식을 확인해 주세요."
 			);
 		}
-		return value;
 	}
 }

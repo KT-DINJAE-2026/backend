@@ -17,6 +17,10 @@ app:
     enabled: true
   topis:
     enabled: false
+  holiday:
+    enabled: false
+  weather:
+    enabled: false
 
 logging:
   level:

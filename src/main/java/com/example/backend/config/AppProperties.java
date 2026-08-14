@@ -18,6 +18,8 @@ public class AppProperties {
 	private final Api api = new Api();
 	private final MasterData masterData = new MasterData();
 	private final Topis topis = new Topis();
+	private final Holiday holiday = new Holiday();
+	private final Weather weather = new Weather();
 	private final Demo demo = new Demo();
 	private final Cors cors = new Cors();
 
@@ -31,6 +33,14 @@ public class AppProperties {
 
 	public Topis getTopis() {
 		return topis;
+	}
+
+	public Holiday getHoliday() {
+		return holiday;
+	}
+
+	public Weather getWeather() {
+		return weather;
 	}
 
 	public Demo getDemo() {
@@ -175,6 +185,115 @@ public class AppProperties {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+	}
+
+	/** 한국천문연구원 공휴일 API의 인증·제한시간·연도 캐시 설정. */
+	public static class Holiday {
+
+		private boolean enabled = true;
+		private String baseUrl = "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService";
+		private String serviceKey = "";
+		private Duration connectTimeout = Duration.ofSeconds(3);
+		private Duration requestTimeout = Duration.ofSeconds(5);
+		private Duration cacheTtl = Duration.ofHours(24);
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getBaseUrl() {
+			return baseUrl;
+		}
+
+		public void setBaseUrl(String baseUrl) {
+			this.baseUrl = baseUrl;
+		}
+
+		public String getServiceKey() {
+			return serviceKey;
+		}
+
+		public void setServiceKey(String serviceKey) {
+			this.serviceKey = serviceKey;
+		}
+
+		public Duration getConnectTimeout() {
+			return connectTimeout;
+		}
+
+		public void setConnectTimeout(Duration connectTimeout) {
+			this.connectTimeout = connectTimeout;
+		}
+
+		public Duration getRequestTimeout() {
+			return requestTimeout;
+		}
+
+		public void setRequestTimeout(Duration requestTimeout) {
+			this.requestTimeout = requestTimeout;
+		}
+
+		public Duration getCacheTtl() {
+			return cacheTtl;
+		}
+
+		public void setCacheTtl(Duration cacheTtl) {
+			this.cacheTtl = cacheTtl;
+		}
+	}
+
+	/** Open-Meteo 시간별 예보의 제한시간과 일별 캐시 설정. */
+	public static class Weather {
+
+		private boolean enabled = true;
+		private String baseUrl = "https://api.open-meteo.com/v1/forecast";
+		private Duration connectTimeout = Duration.ofSeconds(3);
+		private Duration requestTimeout = Duration.ofSeconds(5);
+		private Duration cacheTtl = Duration.ofMinutes(15);
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getBaseUrl() {
+			return baseUrl;
+		}
+
+		public void setBaseUrl(String baseUrl) {
+			this.baseUrl = baseUrl;
+		}
+
+		public Duration getConnectTimeout() {
+			return connectTimeout;
+		}
+
+		public void setConnectTimeout(Duration connectTimeout) {
+			this.connectTimeout = connectTimeout;
+		}
+
+		public Duration getRequestTimeout() {
+			return requestTimeout;
+		}
+
+		public void setRequestTimeout(Duration requestTimeout) {
+			this.requestTimeout = requestTimeout;
+		}
+
+		public Duration getCacheTtl() {
+			return cacheTtl;
+		}
+
+		public void setCacheTtl(Duration cacheTtl) {
+			this.cacheTtl = cacheTtl;
 		}
 	}
 

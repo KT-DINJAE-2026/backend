@@ -5,6 +5,8 @@ import java.util.UUID;
 import jakarta.validation.ConstraintViolationException;
 
 import com.example.backend.arrival.TopisApiException;
+import com.example.backend.holiday.HolidayApiException;
+import com.example.backend.weather.WeatherApiException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,26 @@ public class GlobalExceptionHandler {
 			case AUTHENTICATION, CONFIGURATION -> ErrorCode.UPSTREAM_UNAVAILABLE;
 			case UPSTREAM_FAILURE, MALFORMED_RESPONSE -> ErrorCode.UPSTREAM_FAILURE;
 			case INVALID_MAPPING -> ErrorCode.INTERNAL_SERVER_ERROR;
+		};
+		return response(errorCode, exception);
+	}
+
+	/** 공휴일 피처 조회 장애도 기존 FE 외부 서비스 오류 형식으로 변환한다. */
+	@ExceptionHandler(HolidayApiException.class)
+	public ResponseEntity<ApiErrorResponse> handleHolidayApiException(HolidayApiException exception) {
+		ErrorCode errorCode = switch (exception.reason()) {
+			case AUTHENTICATION, CONFIGURATION, RATE_LIMITED -> ErrorCode.UPSTREAM_UNAVAILABLE;
+			case UPSTREAM_FAILURE, MALFORMED_RESPONSE -> ErrorCode.UPSTREAM_FAILURE;
+		};
+		return response(errorCode, exception);
+	}
+
+	/** 날씨 피처 조회 장애도 기존 FE 외부 서비스 오류 형식으로 변환한다. */
+	@ExceptionHandler(WeatherApiException.class)
+	public ResponseEntity<ApiErrorResponse> handleWeatherApiException(WeatherApiException exception) {
+		ErrorCode errorCode = switch (exception.reason()) {
+			case CONFIGURATION, RATE_LIMITED -> ErrorCode.UPSTREAM_UNAVAILABLE;
+			case UPSTREAM_FAILURE, MALFORMED_RESPONSE, NO_FORECAST -> ErrorCode.UPSTREAM_FAILURE;
 		};
 		return response(errorCode, exception);
 	}

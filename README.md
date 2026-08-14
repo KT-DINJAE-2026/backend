@@ -109,6 +109,15 @@ backend/
 | `app.topis.base-url` | `http://ws.bus.go.kr/api/rest` | TOPIS 엔드포인트 |
 | `app.topis.connect-timeout` / `request-timeout` | `3s` / `5s` | 연결·응답 제한시간 |
 | `app.topis.cache-ttl` | `20s` | 도착정보 캐시 유지시간 |
+| `app.holiday.enabled` | `true` | 한국천문연구원 공휴일 조회 사용 여부 |
+| `app.holiday.base-url` | 한국천문연구원 특일 정보 URL | `getRestDeInfo` 서비스 기본 주소 |
+| `app.holiday.service-key` | `SEOUL_BUS_API_KEY` | TOPIS와 공통으로 사용하는 공공데이터포털 일반 인증키 |
+| `app.holiday.connect-timeout` / `request-timeout` | `3s` / `5s` | 공휴일 API 연결·응답 제한시간 |
+| `app.holiday.cache-ttl` | `24h` | 연도별 공휴일 목록 캐시 유지시간 |
+| `app.weather.enabled` | `true` | Open-Meteo 시간별 예보 사용 여부 |
+| `app.weather.base-url` | `https://api.open-meteo.com/v1/forecast` | 운영 날씨 예보 API 주소 |
+| `app.weather.connect-timeout` / `request-timeout` | `3s` / `5s` | 날씨 API 연결·응답 제한시간 |
+| `app.weather.cache-ttl` | `15m` | 0.1도 격자·일자별 시간 예보 캐시 유지시간 |
 | `app.demo.enabled` | `false` | demo 초기 데이터 적재 여부 (`demo` 프로필에서 `true`) |
 
 운영 프로필은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경 변수를 사용합니다.
@@ -192,7 +201,7 @@ AI·TOPIS 연동 방식이 확정되기 전에도 FE가 실제 HTTP 연결을 �
 
 TOPIS `getArrInfoByRoute`를 사용해 정류소·노선·정류소 순번별 첫 번째와 두 번째 도착 예정 차량을 조회합니다. `traTime1/2`는 초 단위로 해석해 올림한 분 단위 도착시간을 만들고, `vehId1/2`는 차량 단위 `tripId`, `busType1/2`는 일반·저상·굴절버스 구분으로 변환합니다. 같은 정류소·노선·순번 조회는 기본 20초 동안 메모리에 캐시합니다.
 
-인증키는 저장소에 커밋하지 않습니다. 공공데이터포털의 **일반 인증키(Encoding 또는 Decoding)** 값을 사용해 `.env.example`을 `.env`로 복사한 뒤 값을 입력합니다. 클라이언트가 형식을 판별해 Encoding 키의 이중 인코딩을 방지하며, `.env`는 Git에서 제외됩니다.
+인증키는 저장소에 커밋하지 않습니다. 공공데이터포털의 **일반 인증키(Encoding 또는 Decoding)** 값을 사용해 `.env.example`을 `.env`로 복사한 뒤 값을 입력합니다. TOPIS와 한국천문연구원 공휴일 API 등 공공데이터포털 API는 모두 `SEOUL_BUS_API_KEY` 하나를 공통으로 사용합니다. 클라이언트가 형식을 판별해 Encoding 키의 이중 인코딩을 방지하며, `.env`는 Git에서 제외됩니다.
 
 ```properties
 SEOUL_BUS_API_KEY=발급받은_일반_인증키
@@ -202,6 +211,12 @@ SEOUL_BUS_API_ENABLED=true
 연결 제한시간은 3초, 응답 제한시간은 5초입니다. 운영 환경에서는 동일한 이름의 환경 변수나 비밀 관리 서비스로 주입합니다. 연동을 일시적으로 끄려면 `SEOUL_BUS_API_ENABLED=false`를 사용합니다.
 
 현재 인증키 발급과 API 활용 신청은 완료됐지만 공공데이터포털에서 `SERVICE KEY IS NOT REGISTERED` 응답이 계속되어 실호출 검증은 대기 중입니다. 현재 여정 API는 TOPIS를 호출하지 않고 테스트 데이터를 반환합니다.
+
+## 모델 입력 날씨 연동
+
+운영 날씨는 출발 정류장 좌표와 TOPIS 도착시간으로 계산한 승차 예정 시각을 기준으로 Open-Meteo 시간별 `weather_code`를 조회합니다. 학습 파이프라인과 동일하게 좌표를 0.1도 격자로 맞추고, 격자·날짜별 24시간 예보를 15분 동안 캐시합니다. Open-Meteo 일반 예보 호출에는 공공데이터포털 인증키를 사용하지 않습니다.
+
+PMML이 학습한 값만 전달하도록 WMO 코드를 `맑음`, `구름많음`, `흐림`, `비`, `눈`으로 변환합니다. 별도 학습 범주가 없는 안개는 `흐림`, 뇌우는 `비`로 합칩니다. 현재 demo 여정은 고정값을 유지하며, 실제 PMML 여정 서비스가 `PredictionModelInputFactory.createForStop()`을 호출할 때 날씨 조회가 사용됩니다.
 
 ## 기반정보 적재
 
