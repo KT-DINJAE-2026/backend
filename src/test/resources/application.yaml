@@ -15,3 +15,6 @@ spring:
 app:
   master-data:
     import-enabled: false
+  # 실제 PMML 파일은 저장소에 없어 CI에서 받을 수 없다. 추론 테스트는 테스트용 소형 모델을 직접 적재한다.
+  model:
+    enabled: false

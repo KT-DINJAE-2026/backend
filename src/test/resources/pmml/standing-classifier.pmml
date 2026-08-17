@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  테스트용 소형 입석 여부 분류 모델.
+
+  실제 model_a.pmml은 용량이 커서 저장소에 없다(models/README.md 참고). 이 파일은 실제 모델과
+  같은 입력 계약(원본 ID를 정수로, 요일·날씨를 한글 문자열로)과 같은 출력 계약(probability(1))을
+  그대로 흉내 내 어댑터와 추론 배선을 CI에서도 검증할 수 있게 한다.
+
+  분기: route_id가 100100129 또는 100100031이고 hour가 8 이상이면 입석 확률 0.8, 그 외에는 0.1.
+-->
+<PMML xmlns="http://www.dmg.org/PMML-4_4" version="4.4">
+	<Header>
+		<Application name="backend test fixture"/>
+	</Header>
+	<DataDictionary>
+		<DataField name="_target" optype="categorical" dataType="integer">
+			<Value value="0"/>
+			<Value value="1"/>
+		</DataField>
+		<DataField name="route_id" optype="categorical" dataType="integer">
+			<Value value="100100129"/>
+			<Value value="100100031"/>
+		</DataField>
+		<DataField name="board_stop_id" optype="categorical" dataType="integer">
+			<Value value="107000087"/>
+			<Value value="107000088"/>
+		</DataField>
+		<DataField name="alight_stop_id" optype="categorical" dataType="integer">
+			<Value value="107000089"/>
+			<Value value="100000147"/>
+		</DataField>
+		<DataField name="weekday" optype="categorical" dataType="string">
+			<Value value="월"/>
+			<Value value="화"/>
+			<Value value="수"/>
+			<Value value="목"/>
+			<Value value="금"/>
+			<Value value="토"/>
+			<Value value="일"/>
+		</DataField>
+		<DataField name="weather" optype="categorical" dataType="string">
+			<Value value="구름많음"/>
+			<Value value="맑음"/>
+			<Value value="비"/>
+			<Value value="흐림"/>
+			<Value value="눈"/>
+		</DataField>
+		<DataField name="hour" optype="continuous" dataType="double"/>
+		<DataField name="is_holiday" optype="continuous" dataType="double"/>
+		<DataField name="headway_sec" optype="continuous" dataType="double"/>
+	</DataDictionary>
+	<TreeModel functionName="classification" missingValueStrategy="lastPrediction"
+			noTrueChildStrategy="returnLastPrediction">
+		<MiningSchema>
+			<MiningField name="_target" usageType="target"/>
+			<MiningField name="route_id" invalidValueTreatment="asMissing"/>
+			<MiningField name="board_stop_id" invalidValueTreatment="asMissing"/>
+			<MiningField name="alight_stop_id" invalidValueTreatment="asMissing"/>
+			<MiningField name="weekday" invalidValueTreatment="asMissing"/>
+			<MiningField name="weather" invalidValueTreatment="asMissing"/>
+			<MiningField name="hour" invalidValueTreatment="asIs"/>
+			<MiningField name="is_holiday" invalidValueTreatment="asIs"/>
+			<MiningField name="headway_sec" invalidValueTreatment="asIs"/>
+		</MiningSchema>
+		<Output>
+			<OutputField name="probability(0)" optype="continuous" dataType="double"
+					feature="probability" value="0"/>
+			<OutputField name="probability(1)" optype="continuous" dataType="double"
+					feature="probability" value="1"/>
+		</Output>
+		<Node score="0">
+			<True/>
+			<ScoreDistribution value="0" recordCount="90"/>
+			<ScoreDistribution value="1" recordCount="10"/>
+			<Node score="1">
+				<SimpleSetPredicate field="route_id" booleanOperator="isIn">
+					<Array type="int">100100129 100100031</Array>
+				</SimpleSetPredicate>
+				<ScoreDistribution value="0" recordCount="90"/>
+				<ScoreDistribution value="1" recordCount="10"/>
+				<Node score="1">
+					<SimplePredicate field="hour" operator="greaterOrEqual" value="8"/>
+					<ScoreDistribution value="0" recordCount="20"/>
+					<ScoreDistribution value="1" recordCount="80"/>
+				</Node>
+			</Node>
+		</Node>
+	</TreeModel>
+</PMML>

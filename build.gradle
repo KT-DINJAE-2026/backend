@@ -26,6 +26,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
+	// AI팀 PMML 모델을 Spring Boot 프로세스 안에서 직접 추론한다.
+	// metro는 PMML XML 언마샬링에 필요한 JAXB 런타임을 제공한다.
+	implementation 'org.jpmml:pmml-evaluator:1.7.3'
+	runtimeOnly 'org.jpmml:pmml-evaluator-metro:1.7.3'
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'

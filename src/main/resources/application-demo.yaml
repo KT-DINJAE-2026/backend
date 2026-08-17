@@ -21,6 +21,9 @@ app:
     enabled: false
   weather:
     enabled: false
+  # demo는 고정 응답으로 FE 계약만 검증하므로 모델을 적재하지 않는다.
+  model:
+    enabled: false
 
 logging:
   level:

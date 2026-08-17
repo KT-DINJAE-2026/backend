@@ -20,6 +20,7 @@ public class AppProperties {
 	private final Topis topis = new Topis();
 	private final Holiday holiday = new Holiday();
 	private final Weather weather = new Weather();
+	private final Model model = new Model();
 	private final Demo demo = new Demo();
 	private final Cors cors = new Cors();
 
@@ -41,6 +42,10 @@ public class AppProperties {
 
 	public Weather getWeather() {
 		return weather;
+	}
+
+	public Model getModel() {
+		return model;
 	}
 
 	public Demo getDemo() {
@@ -294,6 +299,52 @@ public class AppProperties {
 
 		public void setCacheTtl(Duration cacheTtl) {
 			this.cacheTtl = cacheTtl;
+		}
+	}
+
+	/**
+	 * AI팀이 전달한 입석 예측 PMML 모델의 위치와 활성화 설정.
+	 *
+	 * <p>모델 파일은 용량이 커서 저장소에 커밋하지 않으므로(`models/README.md` 참고) 파일이 없는
+	 * 환경에서는 {@code enabled}를 꺼야 한다. demo 프로필과 테스트는 기본으로 꺼져 있다.</p>
+	 */
+	public static class Model {
+
+		private boolean enabled = true;
+		private String directory = "models";
+		private String classifierFile = "model_a.pmml";
+		private String regressorFile = "model_b.pmml";
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getDirectory() {
+			return directory;
+		}
+
+		public void setDirectory(String directory) {
+			this.directory = directory;
+		}
+
+		public String getClassifierFile() {
+			return classifierFile;
+		}
+
+		public void setClassifierFile(String classifierFile) {
+			this.classifierFile = classifierFile;
+		}
+
+		public String getRegressorFile() {
+			return regressorFile;
+		}
+
+		public void setRegressorFile(String regressorFile) {
+			this.regressorFile = regressorFile;
 		}
 	}
 
