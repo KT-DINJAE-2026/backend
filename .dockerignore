@@ -1,4 +1,6 @@
 # 로컬 docker build 컨텍스트에서 제외할 것들. Dockerfile이 COPY하는 경로만 있으면 된다.
+# masterdata/archive는 한 달치 원본 보관용(수 GB)이라 이미지에 절대 넣지 않는다.
+masterdata/archive/
 .env
 .local/
 .git/

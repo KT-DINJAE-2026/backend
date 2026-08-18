@@ -7,6 +7,8 @@
 .local/
 
 # 빌드에 불필요한 것들
+# masterdata/archive는 한 달치 원본 보관용(수 GB)이라 업로드하지 않는다.
+masterdata/archive/
 .git/
 .gradle/
 .github/
