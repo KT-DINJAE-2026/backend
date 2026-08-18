@@ -37,7 +37,7 @@ CI로 자동화한다면 그때 모델 파일 전달 방법(GCS 등)을 먼저 �
 | `weather` | categorical | string | `맑음` `구름많음` `흐림` `비` `눈` |
 | `hour` | continuous | double | 0~23 |
 | `is_holiday` | continuous | double | 공휴일 `1.0`, 평일 `0.0` |
-| `headway_sec` | continuous | double | 배차 간격(초). 값이 없으면 결측(NaN) |
+| `headway_sec` | continuous | double | 배차 간격(초). 값이 없으면 결측(NaN). 학습은 교통카드 데이터로 추정한 배차간격을 썼고, 운영은 공공데이터포털 오류로 값을 받을 수 없어 당분간 결측으로 입력한다(AI팀 답변 2026-08-18) |
 
 ### 매핑 JSON을 쓰지 않는 이유
 
