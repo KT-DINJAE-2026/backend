@@ -55,7 +55,7 @@ flowchart TB
         subgraph run["Cloud Run"]
             app["Spring Boot 백엔드<br/>prod 프로필<br/>PMML 모델 이미지 내장"]
         end
-        sql[("Cloud SQL<br/>MySQL 8.4<br/>정류장·노선 기반정보")]
+        sql[("Cloud SQL<br/>MySQL 8.0<br/>정류장·노선 기반정보")]
         sm["Secret Manager<br/>DB 비밀번호 · TOPIS API 키"]
         ar["Artifact Registry<br/>Docker 이미지 저장소"]
         job["Cloud Run Job (1회성)<br/>스키마 생성 · 기반정보 적재"]
@@ -87,9 +87,13 @@ Cloud Run 프록시 뒤에서도 요청 스킴·호스트가 올바르게 인식
 단순하고, 모델이 업데이트되면 이미지를 다시 빌드·배포하면 된다. 모델 파일과 매핑 JSON은
 반드시 같은 버전 짝으로 교체한다.
 
-**Cloud SQL — MySQL 8.4.**
-로컬 compose와 동일한 MySQL 8.4로 만들어 환경 차이를 없앤다. 시연 트래픽에는 최소 사양
-(공유 코어 1 vCPU급)이면 충분하다. Cloud Run에서 Cloud SQL 커넥터 또는 퍼블릭 IP + 승인된
+**Cloud SQL — MySQL 8.0 (Enterprise 에디션).**
+당초 로컬 compose와 동일한 8.4를 계획했으나, Cloud SQL에서 MySQL 8.4는 Enterprise Plus
+에디션 전용이고 최소 사양이 db-perf-optimized-N-2(월 수십만 원대)라 시연 예산에 맞지 않는다.
+Enterprise 에디션 + db-f1-micro가 가능한 MySQL 8.0으로 조정했다. 이 앱은 표준 JPA와
+upsert만 사용하며, 8.0 컨테이너 상대로 스키마 생성·기반정보 적재·API 응답을 전부 검증했다
+(2026-08-18). 로컬 compose는 8.4를 유지한다(기존 볼륨의 다운그레이드 불가, 마이너 버전
+차이는 검증됨). 시연 트래픽에는 최소 사양(공유 코어 1 vCPU급)이면 충분하다. Cloud Run에서 Cloud SQL 커넥터 또는 퍼블릭 IP + 승인된
 네트워크로 연결하고, 접속 정보는 Secret Manager를 거쳐 환경변수로 주입한다.
 
 **Cloud Run Job — 초기 데이터 적재 (1회성).**
@@ -208,7 +212,7 @@ Cloud Run 방식에 문제가 생겼을 때의 대비책으로만 남겨둔다.
 |---|---|---|---|
 | 1 | GCP 프로젝트 + 결제 계정 | 신규 계정 $300 크레딧 활성화, 리전은 전부 `asia-northeast3` | 모든 리소스의 컨테이너 |
 | 2 | Cloud Run 서비스 `backend` | 1 vCPU / **메모리 1GiB**, min 0(시연일 1) / max 2, 포트 8080, 미인증 호출 허용 | Spring Boot 백엔드 실행 |
-| 3 | Cloud SQL 인스턴스 | **MySQL 8.4**(로컬 compose와 동일), 공유 코어 최소 사양(db-f1-micro급), SSD 10GiB, 데이터베이스 1개 + 앱 전용 계정 | 정류장·노선 기반정보 저장 |
+| 3 | Cloud SQL 인스턴스 | **MySQL 8.0**(Enterprise 에디션 — 8.4는 Enterprise Plus 전용이라 비용상 제외), db-f1-micro, SSD 10GiB, 데이터베이스 1개 + 앱 전용 계정 | 정류장·노선 기반정보 저장 |
 | 4 | Artifact Registry 저장소 | Docker 형식, `asia-northeast3` | 백엔드 이미지 저장 |
 | 5 | Secret Manager 시크릿 | `db-password`, `topis-api-key` 2건 | 민감 정보를 코드·이미지 밖으로 분리 |
 | 6 | Cloud Run Job `backend-init` | 서비스와 같은 이미지, `app.master-data.import-enabled=true`로 실행 | 최초 1회 스키마 생성·기반정보 적재 |
