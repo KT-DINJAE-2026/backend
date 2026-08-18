@@ -59,6 +59,10 @@ __pycache__/
 models/*
 !models/README.md
 
+### 기반정보 DAT 파일 (용량이 커 팀 내 별도 공유, README만 커밋) ###
+masterdata/*
+!masterdata/README.md
+
 ### 인수인계 문서 (개인 작업 메모 성격) ###
 *HANDOFF*
 

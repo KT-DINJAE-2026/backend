@@ -55,7 +55,7 @@ flowchart TB
         subgraph run["Cloud Run"]
             app["Spring Boot 백엔드<br/>prod 프로필<br/>PMML 모델 이미지 내장"]
         end
-        sql[("Cloud SQL<br/>MySQL 8.4<br/>정류장·노선 기반정보")]
+        sql[("Cloud SQL<br/>MySQL 8.0<br/>정류장·노선 기반정보")]
         sm["Secret Manager<br/>DB 비밀번호 · TOPIS API 키"]
         ar["Artifact Registry<br/>Docker 이미지 저장소"]
         job["Cloud Run Job (1회성)<br/>스키마 생성 · 기반정보 적재"]
@@ -87,9 +87,13 @@ Cloud Run 프록시 뒤에서도 요청 스킴·호스트가 올바르게 인식
 단순하고, 모델이 업데이트되면 이미지를 다시 빌드·배포하면 된다. 모델 파일과 매핑 JSON은
 반드시 같은 버전 짝으로 교체한다.
 
-**Cloud SQL — MySQL 8.4.**
-로컬 compose와 동일한 MySQL 8.4로 만들어 환경 차이를 없앤다. 시연 트래픽에는 최소 사양
-(공유 코어 1 vCPU급)이면 충분하다. Cloud Run에서 Cloud SQL 커넥터 또는 퍼블릭 IP + 승인된
+**Cloud SQL — MySQL 8.0 (Enterprise 에디션).**
+당초 로컬 compose와 동일한 8.4를 계획했으나, Cloud SQL에서 MySQL 8.4는 Enterprise Plus
+에디션 전용이고 최소 사양이 db-perf-optimized-N-2(월 수십만 원대)라 시연 예산에 맞지 않는다.
+Enterprise 에디션 + db-f1-micro가 가능한 MySQL 8.0으로 조정했다. 이 앱은 표준 JPA와
+upsert만 사용하며, 8.0 컨테이너 상대로 스키마 생성·기반정보 적재·API 응답을 전부 검증했다
+(2026-08-18). 로컬 compose는 8.4를 유지한다(기존 볼륨의 다운그레이드 불가, 마이너 버전
+차이는 검증됨). 시연 트래픽에는 최소 사양(공유 코어 1 vCPU급)이면 충분하다. Cloud Run에서 Cloud SQL 커넥터 또는 퍼블릭 IP + 승인된
 네트워크로 연결하고, 접속 정보는 Secret Manager를 거쳐 환경변수로 주입한다.
 
 **Cloud Run Job — 초기 데이터 적재 (1회성).**
@@ -125,6 +129,10 @@ flowchart LR
 배포가 잦아지면 GitHub Actions에서 `main` 머지 시 위 1~3단계를 자동화할 수 있다
 (GCP 공식 `google-github-actions/deploy-cloudrun` 액션 사용).
 
+빌드는 반드시 모델(`models/`)과 기반정보(`masterdata/`)를 채운 로컬에서 제출해야 한다.
+`.gcloudignore`가 업로드 목록을 관리한다 — 이 파일이 없으면 `gcloud`가 `.gitignore`를 대신 쓰기
+때문에 `models/*`가 업로드에서 빠져 빌드가 실패한다. 시크릿(`.env`)은 업로드에서 제외된다.
+
 배포 명령 예시:
 
 ```bash
@@ -136,11 +144,41 @@ gcloud builds submit --tag \
 gcloud run deploy backend \
   --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
   --region asia-northeast3 \
-  --set-env-vars SPRING_PROFILES_ACTIVE=prod,ML_MODEL_DIR=/models \
-  --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-key:latest \
+  --memory 1Gi \
+  --set-env-vars "SPRING_PROFILES_ACTIVE=prod,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
+  --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
   --add-cloudsql-instances <PROJECT>:asia-northeast3:<INSTANCE> \
+  --service-account backend-runtime@<PROJECT>.iam.gserviceaccount.com \
   --allow-unauthenticated
 ```
+
+`ML_MODEL_DIR=/models`는 Dockerfile이 기본값으로 넣어두므로 따로 지정할 필요 없다.
+
+### backend-init Job — 최초 1회 스키마 생성·기반정보 적재
+
+서비스와 같은 이미지를 쓰되 세 가지를 재정의한다. ① `SPRING_MAIN_WEB_APPLICATION_TYPE=none`으로
+웹서버 없이 기동해 적재 러너(`MasterDataImportRunner`)가 끝나면 프로세스가 종료되도록 한다
+(Job은 프로세스 종료를 완료로 판정한다). ② `DDL_AUTO=update`로 스키마를 생성한다
+(서비스는 `validate` 유지). ③ 적재에 모델이 필요 없으므로 `ML_MODEL_ENABLED=false`로 끈다.
+
+```bash
+gcloud run jobs create backend-init \
+  --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
+  --region asia-northeast3 \
+  --memory 1Gi \
+  --task-timeout=30m --max-retries=1 \
+  --set-env-vars "SPRING_PROFILES_ACTIVE=prod,SPRING_MAIN_WEB_APPLICATION_TYPE=none,DDL_AUTO=update,ML_MODEL_ENABLED=false,APP_MASTER_DATA_IMPORT_ENABLED=true,MASTER_STOP_FILE=/masterdata/STTN_20250401.dat,MASTER_ROUTE_FILE=/masterdata/ROUTE_20250401.dat,MASTER_ROUTE_STOP_FILE=/masterdata/ROUTESTTN_20250401.dat,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
+  --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
+  --set-cloudsql-instances <PROJECT>:asia-northeast3:<INSTANCE> \
+  --service-account backend-runtime@<PROJECT>.iam.gserviceaccount.com
+
+gcloud run jobs execute backend-init --region asia-northeast3 --wait
+```
+
+기반정보 DAT 파일명(기준일)은 실제 `masterdata/`에 넣은 파일에 맞춘다.
+
+`--task-timeout=30m`은 필수다. 기본 태스크 타임아웃(10분)은 db-f1-micro의 적재 속도로는
+부족해서(전체 12~15분) 적재 도중 태스크가 죽고 재시도를 반복한다(2026-08-18 실측).
 
 ## 4. 시연 당일 체크리스트
 
@@ -178,7 +216,7 @@ Cloud Run 방식에 문제가 생겼을 때의 대비책으로만 남겨둔다.
 |---|---|---|---|
 | 1 | GCP 프로젝트 + 결제 계정 | 신규 계정 $300 크레딧 활성화, 리전은 전부 `asia-northeast3` | 모든 리소스의 컨테이너 |
 | 2 | Cloud Run 서비스 `backend` | 1 vCPU / **메모리 1GiB**, min 0(시연일 1) / max 2, 포트 8080, 미인증 호출 허용 | Spring Boot 백엔드 실행 |
-| 3 | Cloud SQL 인스턴스 | **MySQL 8.4**(로컬 compose와 동일), 공유 코어 최소 사양(db-f1-micro급), SSD 10GiB, 데이터베이스 1개 + 앱 전용 계정 | 정류장·노선 기반정보 저장 |
+| 3 | Cloud SQL 인스턴스 | **MySQL 8.0**(Enterprise 에디션 — 8.4는 Enterprise Plus 전용이라 비용상 제외), db-f1-micro, SSD 10GiB, 데이터베이스 1개 + 앱 전용 계정 | 정류장·노선 기반정보 저장 |
 | 4 | Artifact Registry 저장소 | Docker 형식, `asia-northeast3` | 백엔드 이미지 저장 |
 | 5 | Secret Manager 시크릿 | `db-password`, `topis-api-key` 2건 | 민감 정보를 코드·이미지 밖으로 분리 |
 | 6 | Cloud Run Job `backend-init` | 서비스와 같은 이미지, `app.master-data.import-enabled=true`로 실행 | 최초 1회 스키마 생성·기반정보 적재 |
@@ -196,30 +234,17 @@ secretmanager.googleapis.com
 cloudbuild.googleapis.com     # gcloud builds submit 사용 시
 ```
 
-### 코드 쪽에서 준비할 것
+### 코드 쪽에서 준비된 것
 
-**Dockerfile (신규 작성 필요).** 멀티 스테이지로 Gradle 빌드 후 JRE 21 이미지에 JAR와
-PMML 모델을 담는다.
+**Dockerfile (작성 완료).** 저장소 루트의 `Dockerfile`이 멀티 스테이지로 Gradle 래퍼 빌드 후
+JRE 21 이미지에 JAR·PMML 모델(`/models`)·기반정보 DAT(`/masterdata`)를 담는다. 서비스와
+backend-init Job이 같은 이미지를 쓴다. 컨텍스트 관리는 `.dockerignore`(로컬 빌드)와
+`.gcloudignore`(Cloud Build 업로드)가 담당한다.
 
-```dockerfile
-FROM gradle:8-jdk21 AS build
-WORKDIR /app
-COPY . .
-RUN gradle bootJar --no-daemon
-
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
-COPY models/ /models/
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-**Cloud SQL 소켓 팩토리 의존성 (build.gradle에 추가).** Cloud Run은 `--add-cloudsql-instances`로
-연결한 인스턴스를 유닉스 소켓으로 노출하는데, MySQL 드라이버가 이를 쓰려면 커넥터 라이브러리가 필요하다.
-
-```gradle
-implementation 'com.google.cloud.sql:mysql-socket-factory-connector-j-8:1.21.0'
-```
+**Cloud SQL 소켓 팩토리 의존성 (추가 완료).** Cloud Run은 `--add-cloudsql-instances`로
+연결한 인스턴스를 유닉스 소켓으로 노출하는데, MySQL 드라이버가 이를 쓰려면 커넥터 라이브러리가
+필요하다. `build.gradle`에 `com.google.cloud.sql:mysql-socket-factory-connector-j-8`을
+`runtimeOnly`로 추가해뒀다.
 
 이때 `DB_URL` 환경변수는 다음 형식이 된다.
 

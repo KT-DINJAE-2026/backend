@@ -64,7 +64,9 @@ Windows 한글 경로에서 전체 빌드를 실행할 때도 같은 우회 옵�
 backend/
 ├── build.gradle          # 의존성·빌드 설정
 ├── compose.yaml          # 로컬 개발용 MySQL 컨테이너 정의
+├── Dockerfile            # 시연 배포용 이미지 (docs/CLOUD_ARCHITECTURE.md)
 ├── docs/                 # 협업·설계 문서
+├── masterdata/           # 기반정보 DAT (README만 커밋, 파일은 별도 공유)
 ├── models/               # AI팀 PMML 모델 (README만 커밋, 모델 파일은 별도 공유)
 ├── src
 │   ├── main
@@ -271,7 +273,7 @@ models/
 
 ### 남은 작업
 
-`headway_sec` 운영 공급자와 여정 API 연결이 남아 있습니다. 아직 `/api/v1/journeys/predictions`는 이 예측기를 호출하지 않습니다. 전달받은 모델은 하이퍼파라미터 실험 중인 임시 버전이며, Python 원본과 Java 추론 결과를 대조할 golden test는 아직 전달받지 못했습니다.
+여정 API 연결이 남아 있습니다. 아직 `/api/v1/journeys/predictions`는 이 예측기를 호출하지 않습니다. `headway_sec`은 운영 공급자가 없어(공공데이터포털 오류, AI팀 확인) 당분간 결측으로 입력하기로 확정했습니다. 전달받은 모델은 하이퍼파라미터 실험 중인 임시 버전이며, Python 원본과 Java 추론 결과를 대조할 golden test는 아직 전달받지 못했습니다.
 
 ## 기반정보 적재
 
@@ -323,7 +325,7 @@ python data-pipeline\build_metropolitan_roster.py `
 
 모델 적재와 추론은 구현했지만 `JourneyTestDataService`가 아직 여정 응답을 담당합니다. 연결까지 다음 작업이 남아 있습니다.
 
-- 운영 `headway_sec` 공급자 — TOPIS 첫 번째·두 번째 도착 차량의 간격을 쓰는 방안이 유력하나 학습 시 정의(승차 태그 기준 직전 회차 간격)와 의미가 달라 검토가 필요합니다
+- ~~운영 `headway_sec` 공급자~~ — AI팀 답변(2026-08-18)으로 해소: 학습의 `headway_sec`은 교통카드 데이터로 추정한 배차간격이며, 운영에서는 공공데이터포털 오류로 배차간격을 받을 수 없는 상황입니다. 계약상 결측이 허용되므로 **당분간 결측(NaN)으로 입력**합니다. 포털이 복구되더라도 API 값과 학습 정의(교통카드 추정치)의 의미 차이를 검토한 뒤에 연결합니다
 - TOPIS 도착시간으로 차량별 승차 예정 시각을 만들어 예측기에 전달
 - 입석시간 5분 기준 `MEDIUM`·`HIGH` 변환과 구간별 입석 가능성 계산
 - 표본 부족 판정 기준과 `confidence` 산정 방식 — AI팀의 평가 결과를 근거로 최소 표본 수 권고를 받아야 합니다
@@ -332,8 +334,19 @@ python data-pipeline\build_metropolitan_roster.py `
 
 전달받은 모델은 임시 버전이므로 최종본 교체 후 전체 회귀 테스트가 필요하고, Python 원본과의 동등성을 확인할 golden test를 AI팀에 요청해야 합니다.
 
+## 배포 (GCP 시연 환경)
+
+시연용 배포는 GCP Cloud Run + Cloud SQL 구성이며 전체 설계·리소스 목록·배포 명령은
+[docs/CLOUD_ARCHITECTURE.md](docs/CLOUD_ARCHITECTURE.md)에 있습니다. 요약하면:
+
+- 루트 `Dockerfile`이 앱 JAR와 PMML 모델(`/models`), 기반정보 DAT(`/masterdata`)를 한 이미지에 담습니다. 서비스와 초기 적재 Job(`backend-init`)이 같은 이미지를 사용합니다.
+- 모델과 기반정보 파일은 git에 없으므로 두 디렉터리를 채운 **로컬에서 `gcloud builds submit`으로 빌드**합니다. `.gcloudignore`가 업로드 목록을 관리하며, 시크릿(`.env`)은 업로드되지 않습니다.
+- 운영(prod) 스키마는 `validate`로 기동하고, 최초 1회 스키마 생성·기반정보 적재는 `backend-init` Job이 `DDL_AUTO=update` 등으로 재정의해 수행합니다.
+- 여정 예측 API는 현재 테스트 데이터 응답으로 배포하며(팀 합의), AI팀 최종 모델이 오면 `models/`를 교체하고 이미지를 다시 빌드·배포합니다.
+- 2026-08-18 최초 배포·검증 완료 — 서비스 URL·Swagger 주소·엔드포인트별 검증 결과는 [docs/DEPLOYMENT_SMOKE_TEST.md](docs/DEPLOYMENT_SMOKE_TEST.md)에 기록되어 있습니다.
+- 코드·모델·기반정보 수정 후 재배포 절차와 롤백 방법은 [docs/DEPLOY_RUNBOOK.md](docs/DEPLOY_RUNBOOK.md)를 따릅니다.
+
 ## 컨벤션 메모
 
 - 시크릿(운영 DB 비밀번호 등)은 커밋하지 않고 환경 변수 또는 `.env`(gitignore 처리됨)로 관리합니다.
 - 주석은 코드가 그대로 보여주는 동작을 반복하지 않고, 클래스 책임·외부 데이터 계약·예외 처리 이유·알고리즘 선택처럼 수정 시 반드시 알아야 할 의도를 설명합니다. 동작을 변경하면 관련 JavaDoc과 인라인 주석도 함께 갱신합니다.
-- 배포용 컨테이너 이미지는 추후 `./gradlew bootBuildImage` 또는 Dockerfile로 생성할 예정입니다.
