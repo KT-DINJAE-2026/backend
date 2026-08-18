@@ -1,0 +1,17 @@
+# 로컬 docker build 컨텍스트에서 제외할 것들. Dockerfile이 COPY하는 경로만 있으면 된다.
+.env
+.local/
+.git/
+.gradle/
+.github/
+.idea/
+.vscode/
+build/
+out/
+logs/
+*.log
+data-pipeline/
+docs/
+.DS_Store
+hs_err_pid*
+replay_pid*
