@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.example.backend.headway.HeadwayProvider;
 import com.example.backend.holiday.HolidayProvider;
 
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,8 @@ class PredictionModelInputFactoryTests {
 		};
 		PredictionModelInputFactory factory = new PredictionModelInputFactory(
 				holidayProvider,
-				(latitude, longitude, time) -> "맑음"
+				(latitude, longitude, time) -> "맑음",
+				missingHeadway()
 		);
 
 		PredictionModelInput input = factory.create(
@@ -54,7 +56,8 @@ class PredictionModelInputFactoryTests {
 	void keepsMissingWeatherAndHeadwayForTheModelAdapter() {
 		PredictionModelInputFactory factory = new PredictionModelInputFactory(
 				date -> false,
-				(latitude, longitude, time) -> "맑음"
+				(latitude, longitude, time) -> "맑음",
+				missingHeadway()
 		);
 
 		PredictionModelInput input = factory.create(
@@ -81,7 +84,8 @@ class PredictionModelInputFactoryTests {
 					assertThat(longitude).isEqualByComparingTo("127.02000000");
 					assertThat(time).isEqualTo(OffsetDateTime.parse("2026-08-17T09:00:00+09:00"));
 					return "구름많음";
-				}
+				},
+				missingHeadway()
 		);
 
 		PredictionModelInput input = factory.createForStop(
@@ -95,6 +99,37 @@ class PredictionModelInputFactoryTests {
 		);
 
 		assertThat(input.weather()).isEqualTo("구름많음");
+	}
+
+	@Test
+	void looksUpScheduledHeadwayByRouteNumberWithoutReplacingTheModelRouteId() {
+		AtomicReference<String> requestedRouteNumber = new AtomicReference<>();
+		AtomicReference<LocalDate> requestedDate = new AtomicReference<>();
+		PredictionModelInputFactory factory = new PredictionModelInputFactory(
+				date -> false,
+				(latitude, longitude, time) -> "맑음",
+				(routeNumber, serviceDate, publicHoliday) -> {
+					requestedRouteNumber.set(routeNumber);
+					requestedDate.set(serviceDate);
+					assertThat(publicHoliday).isFalse();
+					return 480L;
+				}
+		);
+
+		PredictionModelInput input = factory.createForStop(
+				"100100129",
+				"1014",
+				"107000087",
+				"107000089",
+				new BigDecimal("37.59000000"),
+				new BigDecimal("127.02000000"),
+				OffsetDateTime.parse("2026-08-17T09:00:00+09:00")
+		);
+
+		assertThat(requestedRouteNumber).hasValue("1014");
+		assertThat(requestedDate).hasValue(LocalDate.of(2026, 8, 17));
+		assertThat(input.routeId()).isEqualTo("100100129");
+		assertThat(input.headwaySec()).isEqualTo(480L);
 	}
 
 	@Test
@@ -117,5 +152,9 @@ class PredictionModelInputFactoryTests {
 				"route_id", "board_stop_id", "alight_stop_id", "weekday",
 				"weather", "hour", "is_holiday", "headway_sec"
 		));
+	}
+
+	private static HeadwayProvider missingHeadway() {
+		return (routeNumber, serviceDate, publicHoliday) -> null;
 	}
 }

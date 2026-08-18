@@ -46,6 +46,9 @@ app:
     request-timeout: 5s
     # 같은 정류장·시간대의 후보 차량들이 하루치 예보를 재사용한다.
     cache-ttl: 15m
+  headway:
+    enabled: ${HEADWAY_SCHEDULE_ENABLED:true}
+    schedule-resource: ${HEADWAY_SCHEDULE_RESOURCE:classpath:headway/seoul-bus-headway-20260804.csv}
   model:
     # 모델 파일은 저장소에 없으므로(models/README.md) 파일을 받지 못한 환경에서는 꺼야 한다.
     enabled: ${ML_MODEL_ENABLED:true}

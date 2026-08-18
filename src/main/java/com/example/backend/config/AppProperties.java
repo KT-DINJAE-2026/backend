@@ -20,6 +20,7 @@ public class AppProperties {
 	private final Topis topis = new Topis();
 	private final Holiday holiday = new Holiday();
 	private final Weather weather = new Weather();
+	private final Headway headway = new Headway();
 	private final Model model = new Model();
 	private final Demo demo = new Demo();
 	private final Cors cors = new Cors();
@@ -42,6 +43,10 @@ public class AppProperties {
 
 	public Weather getWeather() {
 		return weather;
+	}
+
+	public Headway getHeadway() {
+		return headway;
 	}
 
 	public Model getModel() {
@@ -299,6 +304,29 @@ public class AppProperties {
 
 		public void setCacheTtl(Duration cacheTtl) {
 			this.cacheTtl = cacheTtl;
+		}
+	}
+
+	/** 서울시 노선 기본정보에서 추출한 요일 유형별 계획 배차간격 설정. */
+	public static class Headway {
+
+		private boolean enabled = true;
+		private String scheduleResource = "classpath:headway/seoul-bus-headway-20260804.csv";
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getScheduleResource() {
+			return scheduleResource;
+		}
+
+		public void setScheduleResource(String scheduleResource) {
+			this.scheduleResource = scheduleResource;
 		}
 	}
 

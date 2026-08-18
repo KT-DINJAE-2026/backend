@@ -77,6 +77,7 @@ backend/
 │   │   │   ├── demo/                      # demo 프로필 초기 데이터
 │   │   │   ├── domain/                    # 정류장·노선·경유 Entity
 │   │   │   ├── error/                     # 공통 API 오류 응답
+│   │   │   ├── headway/                   # 서울시 계획 배차간격 조회
 │   │   │   ├── holiday/                   # 한국천문연구원 공휴일 조회
 │   │   │   ├── masterdata/                # 기반정보 DAT 적재 배치
 │   │   │   ├── prediction/                # 여정 예측 API (현재 테스트 데이터)
@@ -128,6 +129,8 @@ backend/
 | `app.weather.base-url` | `https://api.open-meteo.com/v1/forecast` | 운영 날씨 예보 API 주소 |
 | `app.weather.connect-timeout` / `request-timeout` | `3s` / `5s` | 날씨 API 연결·응답 제한시간 |
 | `app.weather.cache-ttl` | `15m` | 0.1도 격자·일자별 시간 예보 캐시 유지시간 |
+| `app.headway.enabled` | `true` (`HEADWAY_SCHEDULE_ENABLED`) | 서울시 계획 배차간격 조회 사용 여부 |
+| `app.headway.schedule-resource` | `classpath:headway/seoul-bus-headway-20260804.csv` | 노선번호별 평일·토요일·공휴일 배차간격(초) 자료 |
 | `app.model.enabled` | `true` (`ML_MODEL_ENABLED`) | 입석 예측 PMML 적재 여부. 모델 파일이 없는 환경에서는 꺼야 합니다 |
 | `app.model.directory` | `models` (`ML_MODEL_DIR`) | PMML 파일이 있는 디렉터리. 배포 이미지에서는 `/models` |
 | `app.model.classifier-file` | `model_a.pmml` | 입석 여부 분류 모델 파일명 |
@@ -273,7 +276,9 @@ models/
 
 ### 남은 작업
 
-여정 API 연결이 남아 있습니다. 아직 `/api/v1/journeys/predictions`는 이 예측기를 호출하지 않습니다. `headway_sec`은 운영 공급자가 없어(공공데이터포털 오류, AI팀 확인) 당분간 결측으로 입력하기로 확정했습니다. 전달받은 모델은 하이퍼파라미터 실험 중인 임시 버전이며, Python 원본과 Java 추론 결과를 대조할 golden test는 아직 전달받지 못했습니다.
+여정 API 연결이 남아 있습니다. 아직 `/api/v1/journeys/predictions`는 이 예측기를 호출하지 않습니다. 운영 입력 생성기는 서울시 버스노선 기본정보의 계획 배차간격을 `headway_sec`로 공급하며, 값이 `0`·빈값이거나 미매핑 노선이면 결측으로 둡니다. 전달받은 모델은 하이퍼파라미터 실험 중인 임시 버전이며, Python 원본과 Java 추론 결과를 대조할 golden test는 아직 전달받지 못했습니다.
+
+배차간격 자료는 `1014`, `103`, `142` 같은 표시 노선번호로 조회하지만 PMML의 `route_id`는 기존 표준 노선 ID를 그대로 사용합니다. 평일·토요일·공휴일 값을 분리해 선택하고 원본의 분 단위를 초로 변환했습니다. 다만 이 값은 노선별 계획 평균이고 학습 데이터는 승차 태그로 추정한 이전 운행회차 간격이므로 정의가 다릅니다. 현재는 운영 대체값으로 사용하고 최종 모델은 같은 계획 배차간격 정의로 다시 학습하는 것이 안전합니다. 파생 자료와 규칙은 [headway 리소스 문서](src/main/resources/headway/README.md)에 있습니다.
 
 ## 기반정보 적재
 
@@ -325,7 +330,7 @@ python data-pipeline\build_metropolitan_roster.py `
 
 모델 적재와 추론은 구현했지만 `JourneyTestDataService`가 아직 여정 응답을 담당합니다. 연결까지 다음 작업이 남아 있습니다.
 
-- ~~운영 `headway_sec` 공급자~~ — AI팀 답변(2026-08-18)으로 해소: 학습의 `headway_sec`은 교통카드 데이터로 추정한 배차간격이며, 운영에서는 공공데이터포털 오류로 배차간격을 받을 수 없는 상황입니다. 계약상 결측이 허용되므로 **당분간 결측(NaN)으로 입력**합니다. 포털이 복구되더라도 API 값과 학습 정의(교통카드 추정치)의 의미 차이를 검토한 뒤에 연결합니다
+- ~~운영 `headway_sec` 공급자~~ — 서울시 버스노선 기본정보의 노선번호·운행일 유형별 계획 배차간격을 초로 변환해 공급합니다. `0`·빈값·미매핑은 결측으로 유지합니다. 학습의 승차 태그 기반 추정치와 정의가 다르므로 최종 모델 재학습 시 운영과 같은 정의로 통일해야 합니다
 - TOPIS 도착시간으로 차량별 승차 예정 시각을 만들어 예측기에 전달
 - 입석시간 5분 기준 `MEDIUM`·`HIGH` 변환과 구간별 입석 가능성 계산
 - 표본 부족 판정 기준과 `confidence` 산정 방식 — AI팀의 평가 결과를 근거로 최소 표본 수 권고를 받아야 합니다
