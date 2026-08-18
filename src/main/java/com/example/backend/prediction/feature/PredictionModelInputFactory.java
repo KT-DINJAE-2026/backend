@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Objects;
 
+import com.example.backend.headway.HeadwayProvider;
 import com.example.backend.holiday.HolidayProvider;
 import com.example.backend.weather.WeatherProvider;
 
@@ -20,10 +21,51 @@ public class PredictionModelInputFactory {
 
 	private final HolidayProvider holidayProvider;
 	private final WeatherProvider weatherProvider;
+	private final HeadwayProvider headwayProvider;
 
-	public PredictionModelInputFactory(HolidayProvider holidayProvider, WeatherProvider weatherProvider) {
+	public PredictionModelInputFactory(
+			HolidayProvider holidayProvider,
+			WeatherProvider weatherProvider,
+			HeadwayProvider headwayProvider
+	) {
 		this.holidayProvider = holidayProvider;
 		this.weatherProvider = weatherProvider;
+		this.headwayProvider = headwayProvider;
+	}
+
+	/**
+	 * 날씨와 공휴일 및 서울시 계획 배차간격을 조회해 운영용 입력을 만든다.
+	 *
+	 * <p>배차간격 원본에는 표준 노선 ID가 없어 {@code routeNumber}로 조회한다. 파일의 0·빈값 또는
+	 * 미매핑 노선은 모델이 허용하는 결측({@code null})으로 유지한다.</p>
+	 */
+	public PredictionModelInput createForStop(
+			String routeId,
+			String routeNumber,
+			String boardStopId,
+			String alightStopId,
+			BigDecimal boardLatitude,
+			BigDecimal boardLongitude,
+			OffsetDateTime boardingTime
+	) {
+		Objects.requireNonNull(boardingTime, "boardingTime은 null일 수 없습니다.");
+		ZonedDateTime seoulBoardingTime = boardingTime.atZoneSameInstant(SEOUL_ZONE);
+		boolean holiday = holidayProvider.isHoliday(seoulBoardingTime.toLocalDate());
+		String weather = weatherProvider.weatherAt(boardLatitude, boardLongitude, boardingTime);
+		Long headwaySec = headwayProvider.headwaySeconds(
+				routeNumber,
+				seoulBoardingTime.toLocalDate(),
+				holiday
+		);
+		return createPrepared(
+				routeId,
+				boardStopId,
+				alightStopId,
+				seoulBoardingTime,
+				weather,
+				holiday,
+				headwaySec
+		);
 	}
 
 	/**
@@ -63,6 +105,27 @@ public class PredictionModelInputFactory {
 		Objects.requireNonNull(boardingTime, "boardingTime은 null일 수 없습니다.");
 		// 학습 데이터의 board_datetime과 동일하게 실제 승차 예정 시각을 서울 시간으로 변환한다.
 		ZonedDateTime seoulBoardingTime = boardingTime.atZoneSameInstant(SEOUL_ZONE);
+		boolean holiday = holidayProvider.isHoliday(seoulBoardingTime.toLocalDate());
+		return createPrepared(
+				routeId,
+				boardStopId,
+				alightStopId,
+				seoulBoardingTime,
+				weather,
+				holiday,
+				headwaySec
+		);
+	}
+
+	private PredictionModelInput createPrepared(
+			String routeId,
+			String boardStopId,
+			String alightStopId,
+			ZonedDateTime seoulBoardingTime,
+			String weather,
+			boolean holiday,
+			Long headwaySec
+	) {
 		return new PredictionModelInput(
 				routeId,
 				boardStopId,
@@ -70,7 +133,7 @@ public class PredictionModelInputFactory {
 				weekday(seoulBoardingTime.getDayOfWeek()),
 				weather,
 				seoulBoardingTime.getHour(),
-				holidayProvider.isHoliday(seoulBoardingTime.toLocalDate()),
+				holiday,
 				headwaySec
 		);
 	}
