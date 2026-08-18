@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  테스트용 소형 입석시간 회귀 모델.
+
+  실제 model_b.pmml과 같이 예측값이 곧 초 단위 입석시간이며 별도 역변환이 없다.
+  분기: hour가 8 이상이면 360초, 그 외에는 120초.
+-->
+<PMML xmlns="http://www.dmg.org/PMML-4_4" version="4.4">
+	<Header>
+		<Application name="backend test fixture"/>
+	</Header>
+	<DataDictionary>
+		<DataField name="_target" optype="continuous" dataType="double"/>
+		<DataField name="route_id" optype="categorical" dataType="integer">
+			<Value value="100100129"/>
+			<Value value="100100031"/>
+		</DataField>
+		<DataField name="board_stop_id" optype="categorical" dataType="integer">
+			<Value value="107000087"/>
+			<Value value="107000088"/>
+		</DataField>
+		<DataField name="alight_stop_id" optype="categorical" dataType="integer">
+			<Value value="107000089"/>
+			<Value value="100000147"/>
+		</DataField>
+		<DataField name="weekday" optype="categorical" dataType="string">
+			<Value value="월"/>
+			<Value value="화"/>
+			<Value value="수"/>
+			<Value value="목"/>
+			<Value value="금"/>
+			<Value value="토"/>
+			<Value value="일"/>
+		</DataField>
+		<DataField name="weather" optype="categorical" dataType="string">
+			<Value value="구름많음"/>
+			<Value value="맑음"/>
+			<Value value="비"/>
+			<Value value="흐림"/>
+			<Value value="눈"/>
+		</DataField>
+		<DataField name="hour" optype="continuous" dataType="double"/>
+		<DataField name="is_holiday" optype="continuous" dataType="double"/>
+		<DataField name="headway_sec" optype="continuous" dataType="double"/>
+	</DataDictionary>
+	<TreeModel functionName="regression" missingValueStrategy="lastPrediction"
+			noTrueChildStrategy="returnLastPrediction">
+		<MiningSchema>
+			<MiningField name="_target" usageType="target"/>
+			<MiningField name="route_id" invalidValueTreatment="asMissing"/>
+			<MiningField name="board_stop_id" invalidValueTreatment="asMissing"/>
+			<MiningField name="alight_stop_id" invalidValueTreatment="asMissing"/>
+			<MiningField name="weekday" invalidValueTreatment="asMissing"/>
+			<MiningField name="weather" invalidValueTreatment="asMissing"/>
+			<MiningField name="hour" invalidValueTreatment="asIs"/>
+			<MiningField name="is_holiday" invalidValueTreatment="asIs"/>
+			<MiningField name="headway_sec" invalidValueTreatment="asIs"/>
+		</MiningSchema>
+		<Node score="120">
+			<True/>
+			<Node score="360">
+				<SimplePredicate field="hour" operator="greaterOrEqual" value="8"/>
+			</Node>
+		</Node>
+	</TreeModel>
+</PMML>

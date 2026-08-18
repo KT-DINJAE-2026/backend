@@ -54,6 +54,14 @@ data-pipeline/output/
 data-pipeline/cache/
 __pycache__/
 
+### AI 모델 파일 (용량이 커 팀 내 별도 공유, README만 커밋) ###
+# 디렉터리째 제외하면 git이 안으로 내려가지 않아 README 재포함이 불가능하므로 models/* 로 적는다.
+models/*
+!models/README.md
+
+### 인수인계 문서 (개인 작업 메모 성격) ###
+*HANDOFF*
+
 ### 로컬 환경 변수 / 시크릿 ###
 .env
 .local/

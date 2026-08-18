@@ -13,6 +13,7 @@ KT 디인재 프로젝트 백엔드 레포지토리
 | ORM | Spring Data JPA (Hibernate) |
 | DB | MySQL 8.4 (로컬은 Docker Compose로 자동 기동), H2 (테스트·스모크 전용) |
 | API 문서 | springdoc-openapi 3.0.1 (Swagger UI) |
+| AI 추론 | JPMML Evaluator 1.7.3 (LightGBM → PMML 모델을 앱 안에서 직접 실행) |
 | 기타 | Bean Validation, Lombok, Spring Boot DevTools |
 
 ## 사전 요구 사항
@@ -64,6 +65,7 @@ backend/
 ├── build.gradle          # 의존성·빌드 설정
 ├── compose.yaml          # 로컬 개발용 MySQL 컨테이너 정의
 ├── docs/                 # 협업·설계 문서
+├── models/               # AI팀 PMML 모델 (README만 커밋, 모델 파일은 별도 공유)
 ├── src
 │   ├── main
 │   │   ├── java/com/example/backend/
@@ -73,10 +75,15 @@ backend/
 │   │   │   ├── demo/                      # demo 프로필 초기 데이터
 │   │   │   ├── domain/                    # 정류장·노선·경유 Entity
 │   │   │   ├── error/                     # 공통 API 오류 응답
+│   │   │   ├── holiday/                   # 한국천문연구원 공휴일 조회
 │   │   │   ├── masterdata/                # 기반정보 DAT 적재 배치
 │   │   │   ├── prediction/                # 여정 예측 API (현재 테스트 데이터)
+│   │   │   │   ├── feature/               # 모델 입력 8개 피처 생성
+│   │   │   │   └── model/                 # PMML 적재·입석 예측 추론
+│   │   │   ├── publicdata/                # 공공데이터포털 인증키 처리
 │   │   │   ├── repository/                # Spring Data JPA 리포지토리
 │   │   │   ├── stop/                      # 정류장 context/search API
+│   │   │   ├── weather/                   # Open-Meteo 예보 조회
 │   │   │   └── BackendApplication.java   # 메인 클래스
 │   │   └── resources/
 │   │       ├── application.yaml          # 공통 설정
@@ -85,7 +92,8 @@ backend/
 │   │       ├── application-h2.yaml       # H2 파일 스모크 프로필
 │   │       └── application-prod.yaml     # 운영 프로필
 │   └── test
-│       └── java/com/example/backend/
+│       ├── java/com/example/backend/
+│       └── resources/pmml/               # 추론 검증용 소형 PMML (실제 모델 대체)
 └── gradlew               # Gradle Wrapper 실행 스크립트
 ```
 
@@ -118,6 +126,10 @@ backend/
 | `app.weather.base-url` | `https://api.open-meteo.com/v1/forecast` | 운영 날씨 예보 API 주소 |
 | `app.weather.connect-timeout` / `request-timeout` | `3s` / `5s` | 날씨 API 연결·응답 제한시간 |
 | `app.weather.cache-ttl` | `15m` | 0.1도 격자·일자별 시간 예보 캐시 유지시간 |
+| `app.model.enabled` | `true` (`ML_MODEL_ENABLED`) | 입석 예측 PMML 적재 여부. 모델 파일이 없는 환경에서는 꺼야 합니다 |
+| `app.model.directory` | `models` (`ML_MODEL_DIR`) | PMML 파일이 있는 디렉터리. 배포 이미지에서는 `/models` |
+| `app.model.classifier-file` | `model_a.pmml` | 입석 여부 분류 모델 파일명 |
+| `app.model.regressor-file` | `model_b.pmml` | 입석시간 회귀 모델 파일명 |
 | `app.demo.enabled` | `false` | demo 초기 데이터 적재 여부 (`demo` 프로필에서 `true`) |
 
 운영 프로필은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경 변수를 사용합니다.
@@ -218,6 +230,49 @@ SEOUL_BUS_API_ENABLED=true
 
 PMML이 학습한 값만 전달하도록 WMO 코드를 `맑음`, `구름많음`, `흐림`, `비`, `눈`으로 변환합니다. 별도 학습 범주가 없는 안개는 `흐림`, 뇌우는 `비`로 합칩니다. 현재 demo 여정은 고정값을 유지하며, 실제 PMML 여정 서비스가 `PredictionModelInputFactory.createForStop()`을 호출할 때 날씨 조회가 사용됩니다.
 
+## AI 입석 예측 모델 연동
+
+AI팀이 전달한 LightGBM → PMML 모델 두 개를 별도 추론 서버 없이 Spring Boot 프로세스 안에서 직접 실행합니다. 모델 A가 입석 확률을 내고, 확률이 0.5 이상일 때만 모델 B가 입석 지속시간을 초 단위로 냅니다.
+
+### 모델 파일 배치
+
+모델 파일은 27MB로 커서 저장소에 커밋하지 않습니다. 팀에서 공유받은 파일 네 개를 `models/`에 내려받으면 됩니다. 계약과 검증 내역은 [models/README.md](models/README.md)에 정리돼 있습니다.
+
+```
+models/
+├── README.md                             # 커밋됨. 입력·출력 계약과 검증 내역
+├── model_a.pmml                          # 입석 여부 분류
+├── model_b.pmml                          # 입석시간 회귀
+└── category_code_mapping_model_*.json    # 학습 기록용. 추론에는 사용하지 않음
+```
+
+파일을 받지 못한 환경에서는 `ML_MODEL_ENABLED=false`로 끄고 실행합니다. 켜져 있는데 파일이 없으면 요청 처리 중이 아니라 **기동 시점에** 실패합니다. 모델은 기동 시 한 번만 적재해 공유하며, 적재를 마친 evaluator는 스레드 안전합니다. 실측 기준 두 모델 적재에 약 3초, 상주 힙 약 90MiB가 필요합니다.
+
+### 입력 계약
+
+**범주 코드 매핑 JSON은 사용하지 않습니다.** AI팀은 범주형 5개를 매핑 JSON의 정수 코드로 바꿔 입력하라고 안내했지만, 실제 PMML의 `DataDictionary`는 정수 코드가 아니라 원본 표준 ID와 한글 문자열을 값으로 열거하고 있습니다. 매핑 코드를 넣으면 예외 없이 다른 트리 분기로 떨어져 조용히 틀린 예측이 나옵니다.
+
+| 피처 | PMML 선언 | 넣는 값 |
+|---|---|---|
+| `route_id`, `board_stop_id`, `alight_stop_id` | categorical / integer | 표준 ID를 **정수로** (예: `100100129`) |
+| `weekday` | categorical / string | `월`~`일` 한글 요일 |
+| `weather` | categorical / string | `맑음`, `구름많음`, `흐림`, `비`, `눈` |
+| `hour`, `is_holiday`, `headway_sec` | continuous / double | `is_holiday`는 1.0·0.0, `headway_sec`는 결측 허용 |
+
+### 학습 범위 검사
+
+모델은 성북구 경유 노선만 학습해 노선 94개와 정류장 2,893개만 다룹니다. PMML이 범주형 피처를 `invalidValueTreatment="asMissing"`으로 선언하고 있어 학습에 없는 정류장을 넣어도 오류 없이 값이 나오지만 근거가 없습니다. 그래서 추론 전에 PMML이 선언한 범위로 먼저 거르고, 범위 밖이면 예측 대신 `OUT_OF_DOMAIN`을 반환합니다. 범위 목록은 코드에 적지 않고 적재한 PMML에서 직접 읽으므로 모델을 교체하면 함께 갱신됩니다.
+
+### 테스트
+
+실제 모델이 없는 CI에서도 추론 경로 전체를 검증할 수 있도록 같은 계약을 가진 소형 PMML을 `src/test/resources/pmml/`에 두고 사용합니다. 실제 모델 파일이 있는 환경에서는 적재·추론·Spring 배선을 확인하는 테스트가 추가로 실행되고, 파일이 없으면 해당 테스트만 건너뜁니다.
+
+모델을 최종본으로 교체할 때는 로컬에서 전체 테스트를 돌려 입력·출력 계약이 유지되는지 먼저 확인합니다. 매핑 코드를 넣는 실수가 다시 들어오면 테스트가 잡습니다.
+
+### 남은 작업
+
+`headway_sec` 운영 공급자와 여정 API 연결이 남아 있습니다. 아직 `/api/v1/journeys/predictions`는 이 예측기를 호출하지 않습니다. 전달받은 모델은 하이퍼파라미터 실험 중인 임시 버전이며, Python 원본과 Java 추론 결과를 대조할 golden test는 아직 전달받지 못했습니다.
+
 ## 기반정보 적재
 
 `STTN`, `ROUTE`, `ROUTESTTN` 파일은 UTF-8, `|` 구분, 헤더 없음 형식으로 읽습니다. 서로 다른 날짜 파일을 섞지 말고 같은 기준일의 세 파일을 지정해야 합니다. 적재는 기본적으로 꺼져 있으며 명시적으로 활성화한 실행에서만 MySQL에 upsert합니다.
@@ -264,15 +319,18 @@ python data-pipeline\build_metropolitan_roster.py `
 
 ### 실제 예측 연동 계획
 
-AI 입력·출력과 백엔드 연동 방식은 회의 후 확정합니다. 현재 코드에는 예측 테이블, AI CSV 적재, 외부 날씨 조회가 없으며 `JourneyTestDataService`가 테스트 응답을 담당합니다.
+추론 방식은 확정됐습니다. 배치 사전계산이나 별도 추론 서버 없이 요청 시점에 PMML 모델을 앱 안에서 실행하며, 조회 키는 모델 입력 8개 피처입니다. 지원 범위는 성북구 경유 노선 94개와 정류장 2,893개이고, FE 데모 시나리오 중 예측이 필요한 성공·데이터 부족 구간의 정류장과 노선은 모두 이 범위 안에 있습니다.
 
-회의에서 다음 항목을 결정한 뒤 실제 연동을 구현합니다.
+모델 적재와 추론은 구현했지만 `JourneyTestDataService`가 아직 여정 응답을 담당합니다. 연결까지 다음 작업이 남아 있습니다.
 
-- 실시간 API 호출 또는 배치 사전계산 여부
-- 노선·승하차 정류장·요일·시각·날씨 등 조회 키와 예측 단위
-- 입석 부담 단계와 `INSUFFICIENT_DATA`, `confidence` 판정 기준
-- 예측 결과 전달 형식과 갱신 주기
-- 지원 지역·기간과 실제 데모 정류장
+- 운영 `headway_sec` 공급자 — TOPIS 첫 번째·두 번째 도착 차량의 간격을 쓰는 방안이 유력하나 학습 시 정의(승차 태그 기준 직전 회차 간격)와 의미가 달라 검토가 필요합니다
+- TOPIS 도착시간으로 차량별 승차 예정 시각을 만들어 예측기에 전달
+- 입석시간 5분 기준 `MEDIUM`·`HIGH` 변환과 구간별 입석 가능성 계산
+- 표본 부족 판정 기준과 `confidence` 산정 방식 — AI팀의 평가 결과를 근거로 최소 표본 수 권고를 받아야 합니다
+- `OUT_OF_DOMAIN`·모델 미적재 상태를 기존 `INSUFFICIENT_DATA` 응답으로 변환
+- 한 정류장에서 제공할 최대 차량 수 결정
+
+전달받은 모델은 임시 버전이므로 최종본 교체 후 전체 회귀 테스트가 필요하고, Python 원본과의 동등성을 확인할 golden test를 AI팀에 요청해야 합니다.
 
 ## 컨벤션 메모
 
