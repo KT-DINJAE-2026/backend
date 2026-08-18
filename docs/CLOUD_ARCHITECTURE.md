@@ -125,6 +125,10 @@ flowchart LR
 배포가 잦아지면 GitHub Actions에서 `main` 머지 시 위 1~3단계를 자동화할 수 있다
 (GCP 공식 `google-github-actions/deploy-cloudrun` 액션 사용).
 
+빌드는 반드시 모델(`models/`)과 기반정보(`masterdata/`)를 채운 로컬에서 제출해야 한다.
+`.gcloudignore`가 업로드 목록을 관리한다 — 이 파일이 없으면 `gcloud`가 `.gitignore`를 대신 쓰기
+때문에 `models/*`가 업로드에서 빠져 빌드가 실패한다. 시크릿(`.env`)은 업로드에서 제외된다.
+
 배포 명령 예시:
 
 ```bash
@@ -136,11 +140,37 @@ gcloud builds submit --tag \
 gcloud run deploy backend \
   --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
   --region asia-northeast3 \
-  --set-env-vars SPRING_PROFILES_ACTIVE=prod,ML_MODEL_DIR=/models \
-  --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-key:latest \
+  --memory 1Gi \
+  --set-env-vars "SPRING_PROFILES_ACTIVE=prod,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
+  --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
   --add-cloudsql-instances <PROJECT>:asia-northeast3:<INSTANCE> \
+  --service-account backend-runtime@<PROJECT>.iam.gserviceaccount.com \
   --allow-unauthenticated
 ```
+
+`ML_MODEL_DIR=/models`는 Dockerfile이 기본값으로 넣어두므로 따로 지정할 필요 없다.
+
+### backend-init Job — 최초 1회 스키마 생성·기반정보 적재
+
+서비스와 같은 이미지를 쓰되 세 가지를 재정의한다. ① `SPRING_MAIN_WEB_APPLICATION_TYPE=none`으로
+웹서버 없이 기동해 적재 러너(`MasterDataImportRunner`)가 끝나면 프로세스가 종료되도록 한다
+(Job은 프로세스 종료를 완료로 판정한다). ② `DDL_AUTO=update`로 스키마를 생성한다
+(서비스는 `validate` 유지). ③ 적재에 모델이 필요 없으므로 `ML_MODEL_ENABLED=false`로 끈다.
+
+```bash
+gcloud run jobs create backend-init \
+  --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
+  --region asia-northeast3 \
+  --memory 1Gi \
+  --set-env-vars "SPRING_PROFILES_ACTIVE=prod,SPRING_MAIN_WEB_APPLICATION_TYPE=none,DDL_AUTO=update,ML_MODEL_ENABLED=false,APP_MASTER_DATA_IMPORT_ENABLED=true,MASTER_STOP_FILE=/masterdata/STTN_20250401.dat,MASTER_ROUTE_FILE=/masterdata/ROUTE_20250401.dat,MASTER_ROUTE_STOP_FILE=/masterdata/ROUTESTTN_20250401.dat,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
+  --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
+  --set-cloudsql-instances <PROJECT>:asia-northeast3:<INSTANCE> \
+  --service-account backend-runtime@<PROJECT>.iam.gserviceaccount.com
+
+gcloud run jobs execute backend-init --region asia-northeast3 --wait
+```
+
+기반정보 DAT 파일명(기준일)은 실제 `masterdata/`에 넣은 파일에 맞춘다.
 
 ## 4. 시연 당일 체크리스트
 
@@ -196,30 +226,17 @@ secretmanager.googleapis.com
 cloudbuild.googleapis.com     # gcloud builds submit 사용 시
 ```
 
-### 코드 쪽에서 준비할 것
+### 코드 쪽에서 준비된 것
 
-**Dockerfile (신규 작성 필요).** 멀티 스테이지로 Gradle 빌드 후 JRE 21 이미지에 JAR와
-PMML 모델을 담는다.
+**Dockerfile (작성 완료).** 저장소 루트의 `Dockerfile`이 멀티 스테이지로 Gradle 래퍼 빌드 후
+JRE 21 이미지에 JAR·PMML 모델(`/models`)·기반정보 DAT(`/masterdata`)를 담는다. 서비스와
+backend-init Job이 같은 이미지를 쓴다. 컨텍스트 관리는 `.dockerignore`(로컬 빌드)와
+`.gcloudignore`(Cloud Build 업로드)가 담당한다.
 
-```dockerfile
-FROM gradle:8-jdk21 AS build
-WORKDIR /app
-COPY . .
-RUN gradle bootJar --no-daemon
-
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
-COPY models/ /models/
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-**Cloud SQL 소켓 팩토리 의존성 (build.gradle에 추가).** Cloud Run은 `--add-cloudsql-instances`로
-연결한 인스턴스를 유닉스 소켓으로 노출하는데, MySQL 드라이버가 이를 쓰려면 커넥터 라이브러리가 필요하다.
-
-```gradle
-implementation 'com.google.cloud.sql:mysql-socket-factory-connector-j-8:1.21.0'
-```
+**Cloud SQL 소켓 팩토리 의존성 (추가 완료).** Cloud Run은 `--add-cloudsql-instances`로
+연결한 인스턴스를 유닉스 소켓으로 노출하는데, MySQL 드라이버가 이를 쓰려면 커넥터 라이브러리가
+필요하다. `build.gradle`에 `com.google.cloud.sql:mysql-socket-factory-connector-j-8`을
+`runtimeOnly`로 추가해뒀다.
 
 이때 `DB_URL` 환경변수는 다음 형식이 된다.
 
