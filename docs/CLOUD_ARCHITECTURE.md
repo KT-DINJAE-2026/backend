@@ -166,6 +166,7 @@ gcloud run jobs create backend-init \
   --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
   --region asia-northeast3 \
   --memory 1Gi \
+  --task-timeout=30m --max-retries=1 \
   --set-env-vars "SPRING_PROFILES_ACTIVE=prod,SPRING_MAIN_WEB_APPLICATION_TYPE=none,DDL_AUTO=update,ML_MODEL_ENABLED=false,APP_MASTER_DATA_IMPORT_ENABLED=true,MASTER_STOP_FILE=/masterdata/STTN_20250401.dat,MASTER_ROUTE_FILE=/masterdata/ROUTE_20250401.dat,MASTER_ROUTE_STOP_FILE=/masterdata/ROUTESTTN_20250401.dat,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
   --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
   --set-cloudsql-instances <PROJECT>:asia-northeast3:<INSTANCE> \
@@ -175,6 +176,9 @@ gcloud run jobs execute backend-init --region asia-northeast3 --wait
 ```
 
 기반정보 DAT 파일명(기준일)은 실제 `masterdata/`에 넣은 파일에 맞춘다.
+
+`--task-timeout=30m`은 필수다. 기본 태스크 타임아웃(10분)은 db-f1-micro의 적재 속도로는
+부족해서(전체 12~15분) 적재 도중 태스크가 죽고 재시도를 반복한다(2026-08-18 실측).
 
 ## 4. 시연 당일 체크리스트
 
