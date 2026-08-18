@@ -65,6 +65,36 @@ class DemoApiContractTests {
 	}
 
 	@Test
+	void multipleQrOriginsUseTheOfficialSeongbukStopSequence() throws Exception {
+		HttpResponse<String> donamContext = get("/api/v1/stops/107000007/context");
+
+		assertThat(donamContext.statusCode()).isEqualTo(200);
+		assertThat(donamContext.body())
+				.contains("\"stopId\":\"107000007\"")
+				.contains("\"arsId\":\"08007\"")
+				.contains("\"stopName\":\"돈암사거리.성신여대입구\"")
+				.contains("\"stopId\":\"107000089\"")
+				.contains("\"routeNumber\":\"103\"")
+				.contains("\"routeNumber\":\"142\"")
+				.contains("\"routeNumber\":\"152\"");
+
+		HttpResponse<String> prediction = postPrediction("107000007", "107000089");
+		assertThat(prediction.statusCode()).isEqualTo(200);
+		assertThat(prediction.body())
+				.contains("\"status\":\"SUCCESS\"")
+				.contains("\"tripId\":\"test-100100008-vehicle\"")
+				.contains("\"fromStopId\":\"107000007\"")
+				.contains("\"toStopId\":\"107000085\"")
+				.contains("\"travelMinutes\":6");
+
+		HttpResponse<String> bomunContext = get("/api/v1/stops/107000089/context");
+		assertThat(bomunContext.statusCode()).isEqualTo(200);
+		assertThat(bomunContext.body())
+				.contains("\"stopId\":\"107000089\"")
+				.contains("\"stopId\":\"100000147\"");
+	}
+
+	@Test
 	void predictionSuccessMatchesTheServerContract() throws Exception {
 		HttpResponse<String> response = postPrediction("107000087", "107000089");
 

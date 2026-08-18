@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>성북구 버스 정류장 QR 시연</title>
+  <style>
+    :root {
+      color: #172033;
+      font-family: Pretendard, "Noto Sans KR", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f4f6f8;
+    }
+
+    main {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 16mm;
+      background: #ffffff;
+    }
+
+    header {
+      margin-bottom: 10mm;
+    }
+
+    h1 {
+      margin: 0 0 3mm;
+      font-size: 24px;
+    }
+
+    header p {
+      margin: 0;
+      color: #5e687b;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .cards {
+      display: grid;
+      gap: 7mm;
+    }
+
+    .card {
+      display: grid;
+      grid-template-columns: 46mm 1fr;
+      align-items: center;
+      min-height: 66mm;
+      padding: 7mm;
+      border: 1px solid #dce1e8;
+      border-radius: 5mm;
+      break-inside: avoid;
+    }
+
+    .card img {
+      display: block;
+      width: 41mm;
+      height: 41mm;
+    }
+
+    .number {
+      margin: 0 0 2mm;
+      color: #2371df;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    h2 {
+      margin: 0 0 3mm;
+      font-size: 20px;
+      line-height: 1.35;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: 19mm 1fr;
+      gap: 1.5mm 3mm;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    dt { color: #70798b; }
+    dd { margin: 0; font-weight: 700; }
+
+    footer {
+      margin-top: 8mm;
+      color: #70798b;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    @media print {
+      body { background: #ffffff; }
+      main { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>정류장 QR 시연</h1>
+      <p>각 QR은 서로 다른 성북구 정류장을 출발지로 설정합니다.<br>QR을 찍은 뒤 화면 상단의 현재 정류장 이름이 바뀌는지 확인해 주세요.</p>
+    </header>
+
+    <section class="cards" aria-label="정류장 QR 목록">
+      <article class="card">
+        <img src="01-donam-sungsin.svg" alt="돈암사거리 성신여대입구 QR">
+        <div>
+          <p class="number">QR 01</p>
+          <h2>돈암사거리·성신여대입구</h2>
+          <dl>
+            <dt>stopId</dt><dd>107000007</dd>
+            <dt>ARS</dt><dd>08007</dd>
+            <dt>직통 예시</dt><dd>103 · 142 · 152번</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <img src="02-seongbuk-office.svg" alt="성북구청 성북경찰서 QR">
+        <div>
+          <p class="number">QR 02</p>
+          <h2>성북구청·성북경찰서</h2>
+          <dl>
+            <dt>stopId</dt><dd>107000087</dd>
+            <dt>ARS</dt><dd>08177</dd>
+            <dt>직통 예시</dt><dd>1014 · 103 · 142 · 152 · 272번</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <img src="03-bomun-station.svg" alt="보문역 QR">
+        <div>
+          <p class="number">QR 03</p>
+          <h2>보문역</h2>
+          <dl>
+            <dt>stopId</dt><dd>107000089</dd>
+            <dt>ARS</dt><dd>08179</dd>
+            <dt>직통 예시</dt><dd>1014 · 103 · 152번</dd>
+          </dl>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      정류장과 노선 순서는 서울시 2026-08-04 공개 자료 기준입니다. 도착시간과 혼잡도는 발표 시연용 값입니다.
+    </footer>
+  </main>
+</body>
+</html>

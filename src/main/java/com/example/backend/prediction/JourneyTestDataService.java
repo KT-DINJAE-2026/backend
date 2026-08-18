@@ -39,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class JourneyTestDataService {
 
 	private static final String INSUFFICIENT_REASON = "NOT_ENOUGH_HISTORICAL_SAMPLES";
+	private static final String ORIGINAL_ORIGIN_STOP_ID = "107000087";
+	private static final String ORIGINAL_SUCCESS_DESTINATION_STOP_ID = "107000089";
 	private static final String INSUFFICIENT_DESTINATION_STOP_ID = "100000147";
 
 	private static final Map<String, TestRoute> SUCCESS_ROUTES = Map.of(
@@ -84,6 +86,8 @@ public class JourneyTestDataService {
 		}
 
 		boolean insufficient = INSUFFICIENT_DESTINATION_STOP_ID.equals(destination.getId());
+		boolean originalFixedScenario = ORIGINAL_ORIGIN_STOP_ID.equals(origin.getId())
+				&& (ORIGINAL_SUCCESS_DESTINATION_STOP_ID.equals(destination.getId()) || insufficient);
 		List<JourneyRouteResponse> routes = new ArrayList<>();
 		for (int index = 0; index < directRoutes.size(); index++) {
 			RouteEntity route = directRoutes.get(index);
@@ -91,7 +95,7 @@ public class JourneyTestDataService {
 			if (path.isEmpty()) {
 				continue;
 			}
-			TestRoute testRoute = testRoute(route, path.get(), index, insufficient);
+			TestRoute testRoute = testRoute(route, path.get(), index, insufficient, originalFixedScenario);
 			routes.add(toResponse(route, path.get(), testRoute, insufficient));
 		}
 
@@ -112,11 +116,12 @@ public class JourneyTestDataService {
 			RouteEntity route,
 			List<RouteStopEntity> path,
 			int index,
-			boolean insufficient
+			boolean insufficient,
+			boolean originalFixedScenario
 	) {
 		Map<String, TestRoute> configured = insufficient ? INSUFFICIENT_ROUTES : SUCCESS_ROUTES;
-		// FE Mock과 합의된 데모 노선은 고정값을 유지해 화면 회귀 테스트가 흔들리지 않게 한다.
-		TestRoute predefined = configured.get(route.getId());
+		// 기존 한 구간은 FE 회귀 테스트용 값을 유지하고, 다른 QR 구간은 실제 경유 수로 시간을 만든다.
+		TestRoute predefined = originalFixedScenario ? configured.get(route.getId()) : null;
 		if (predefined != null) {
 			return predefined;
 		}

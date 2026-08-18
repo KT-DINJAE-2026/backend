@@ -195,7 +195,13 @@ app:
 
 ### FE 연결용 demo 프로필
 
-AI·TOPIS 연동 방식이 확정되기 전에도 FE가 실제 HTTP 연결을 검증할 수 있도록 격리된 `demo` 프로필을 제공합니다. 메모리 H2에 프론트 Mock과 같은 성공·데이터 부족·직통 없음 시나리오를 넣고, 고정된 테스트 데이터를 반환합니다. 로컬 MySQL과 운영 설정에는 데이터를 기록하지 않습니다.
+AI·TOPIS 연동 방식이 확정되기 전에도 FE가 실제 HTTP 연결을 검증할 수 있도록 격리된 `demo` 프로필을 제공합니다. 메모리 H2에 성북구 실제 정류장과 노선 순서를 넣고, 도착시간·혼잡도만 재현 가능한 시연값으로 반환합니다. 로컬 MySQL과 운영 설정에는 데이터를 기록하지 않습니다.
+
+배포 주소는 아래와 같습니다.
+
+- Base URL: `https://backend-827716553089.asia-northeast3.run.app`
+- Swagger: `https://backend-827716553089.asia-northeast3.run.app/swagger-ui.html`
+- OpenAPI JSON: `https://backend-827716553089.asia-northeast3.run.app/v3/api-docs`
 
 ```powershell
 .\gradlew.bat bootRun --args='--spring.profiles.active=demo'
@@ -209,7 +215,22 @@ AI·TOPIS 연동 방식이 확정되기 전에도 FE가 실제 HTTP 연결을 �
 | 테스트 데이터 부족 | `107000087` | `100000147` | `INSUFFICIENT_DATA`, 도착·이동시간만 제공 |
 | 직통 없음 | `107000087` | `121009999` | `404 NO_DIRECT_ROUTE` |
 
-이 프로필의 값은 FE–BE 계약 확인 전용이며 AI 성능이나 실제 버스 운행 결과로 사용하지 않습니다. FE 서버 모드는 `VITE_API_MODE=server`, `VITE_API_BASE_URL=http://localhost:8080`을 사용합니다.
+여러 정류장 QR 시연에는 아래 URL을 사용합니다. 세 정류장 모두 2026년 8월 4일 기준 서울시 공개 자료의 표준 정류장 ID·ARS 번호·좌표를 사용합니다.
+
+| QR 위치 | stopId / ARS | 프론트 진입 URL |
+|---|---|---|
+| 돈암사거리.성신여대입구 | `107000007` / `08007` | `https://kd-dinjae-2026-fe.vercel.app/?stopId=107000007` |
+| 성북구청.성북경찰서 | `107000087` / `08177` | `https://kd-dinjae-2026-fe.vercel.app/?stopId=107000087` |
+| 보문역 | `107000089` / `08179` | `https://kd-dinjae-2026-fe.vercel.app/?stopId=107000089` |
+
+인쇄용 QR은 [`docs/demo-qr`](docs/demo-qr)에 있습니다. 운영 Vercel은 `VITE_API_MODE=server`, `VITE_API_BASE_URL=https://backend-827716553089.asia-northeast3.run.app`으로 연결합니다. `localhost`를 넣으면 배포된 브라우저가 사용자 PC의 8080 포트를 찾으므로 동작하지 않습니다.
+
+검색 결과의 `servedRoutes: []`는 검색 실패가 아니라 해당 출발지에서 직통 노선이 없다는 뜻입니다. 현재 응답은 실제 AI 예측 연동 전의 계약 검증용 데모 데이터이며, 유휴 상태의 Cloud Run 첫 요청은 10초 이상 걸릴 수 있습니다. 오류 응답의 `traceId`를 함께 전달하면 서버 로그에서 요청을 추적할 수 있습니다.
+
+정류장 ID·ARS·이름·좌표, 노선 ID·번호와 경유 순서는 실제 공개 자료입니다. 도착 예정시간, 이동시간, 차량 종류, 입석 부담과 혼잡도는 FE–BE 계약 확인용 시연값이며 실제 버스 운행 결과나 AI 성능으로 사용하지 않습니다.
+
+- [서울시 버스정류소 위치정보](https://data.seoul.go.kr/dataList/OA-15067/S/1/datasetView.do)
+- [서울시 버스 노선 정보 조회](https://data.seoul.go.kr/dataList/OA-1095/L/1/datasetView.do)
 
 ## 서울시 버스 도착정보 연동
 

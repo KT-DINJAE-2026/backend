@@ -1,7 +1,9 @@
 package com.example.backend.demo;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.example.backend.domain.RouteEntity;
 import com.example.backend.domain.RouteStopEntity;
@@ -17,14 +19,99 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * FE가 외부 시스템 없이 API 계약을 시험하도록 demo 프로필의 H2 데이터를 구성한다.
+ * FE가 외부 시스템 없이 API 계약과 여러 QR 진입을 시험하도록 demo 프로필의 H2 데이터를 구성한다.
  *
- * <p>성공, 혼잡도 데이터 부족, 직통 노선 없음 시나리오를 재현하기 위한 데이터이며
- * 실제 운행·예측 데이터로 사용하면 안 된다. 서버가 재시작되면 메모리 H2와 함께 사라진다.</p>
+ * <p>정류장 ID·ARS 번호·명칭·좌표와 노선 경유 순서는 서울시가 공개한
+ * 2026-08-04 정류소 위치 및 노선별 정류소 자료를 사용한다. 도착시간·차량·혼잡도는
+ * {@code JourneyTestDataService}가 만드는 시연값이며 실제 운행 결과가 아니다.</p>
  */
 @Component
 @ConditionalOnProperty(prefix = "app.demo", name = "enabled", havingValue = "true")
 public class DemoDataInitializer implements ApplicationRunner {
+
+	private static final String SEOUL_OPERATOR_CODE = "11100";
+
+	private static final List<DemoStop> STOPS = List.of(
+			new DemoStop(
+					"107000007", "08007", "돈암사거리.성신여대입구", "성북구",
+					"37.5937432794", "127.0181313708"
+			),
+			new DemoStop(
+					"107000085", "08175", "삼선동주민센터", "성북구",
+					"37.5906107149", "127.0143473137"
+			),
+			new DemoStop(
+					"107000087", "08177", "성북구청.성북경찰서", "성북구",
+					"37.5881520000", "127.0174320000"
+			),
+			new DemoStop(
+					"107000089", "08179", "보문역2번출구", "성북구",
+					"37.5858514183", "127.0189209428"
+			),
+			new DemoStop(
+					"107000091", "08181", "보문동성당", "성북구",
+					"37.5823963244", "127.0207962235"
+			),
+			new DemoStop(
+					"107000093", "08183", "보문동주민센터", "성북구",
+					"37.5804514958", "127.0218634882"
+			),
+			new DemoStop(
+					"100000147", "01243", "신설동역오거리", "종로구",
+					"37.5756947252", "127.0228414296"
+			),
+			// FE 오류 화면 계약을 유지하기 위한 격리된 테스트 정류장이다.
+			new DemoStop(
+					"121009999", "22999", "시연용 직통 노선 없음", "성북구",
+					"37.5845800000", "127.0341400000"
+			)
+	);
+
+	private static final List<DemoRoute> ROUTES = List.of(
+			new DemoRoute(
+					"100100129", "1014", "성북생태체험관", "동묘앞역",
+					List.of(
+							new DemoRouteStop("107000087", 14),
+							new DemoRouteStop("107000089", 15),
+							new DemoRouteStop("107000091", 16),
+							new DemoRouteStop("107000093", 17),
+							new DemoRouteStop("100000147", 18)
+					)
+			),
+			new DemoRoute(
+					"100100008", "103", "삼화상운", "서울역",
+					List.of(
+							new DemoRouteStop("107000007", 18),
+							new DemoRouteStop("107000085", 19),
+							new DemoRouteStop("107000087", 20),
+							new DemoRouteStop("107000089", 21),
+							new DemoRouteStop("107000091", 22),
+							new DemoRouteStop("107000093", 23),
+							new DemoRouteStop("100000147", 24)
+					)
+			),
+			new DemoRoute(
+					"100100021", "142", "도봉산입구", "방배동",
+					List.of(
+							new DemoRouteStop("107000007", 22),
+							new DemoRouteStop("107000085", 23),
+							new DemoRouteStop("107000087", 24),
+							new DemoRouteStop("107000089", 25)
+					)
+			),
+			new DemoRoute(
+					"100100031", "152", "혜화여고.수유중학교입구", "경인교육대후문",
+					List.of(
+							new DemoRouteStop("107000007", 14),
+							new DemoRouteStop("107000085", 15),
+							new DemoRouteStop("107000087", 16),
+							new DemoRouteStop("107000089", 17),
+							new DemoRouteStop("107000091", 18),
+							new DemoRouteStop("107000093", 19),
+							new DemoRouteStop("100000147", 20)
+					)
+			)
+	);
 
 	private final StopRepository stopRepository;
 	private final RouteRepository routeRepository;
@@ -43,75 +130,78 @@ public class DemoDataInitializer implements ApplicationRunner {
 	@Override
 	@Transactional
 	public void run(ApplicationArguments args) {
-		// 목적지 ID는 JourneyTestDataService의 고정 시나리오 ID와 맞춰야 한다.
-		StopEntity origin = saveStop(
-				"107000087", "08177", "성북구청.성북경찰서", "37.5881513802", "127.0174306588"
-		);
-		StopEntity success = saveStop(
-				"107000089", "08179", "보문역2번출구", "37.5858514183", "127.0189209428"
-		);
-		StopEntity middle = saveStop(
-				"100000146", "01242", "동묘앞역", "37.5731800000", "127.0165500000"
-		);
-		StopEntity insufficient = saveStop(
-				"100000147", "01243", "신설동역오거리", "37.5756947252", "127.0228414296"
-		);
-		saveStop("121009999", "22999", "직통노선없는정류장", "37.584580", "127.034140");
+		Map<String, StopEntity> stopsById = new LinkedHashMap<>();
+		for (DemoStop stop : STOPS) {
+			stopsById.put(stop.id(), saveStop(stop));
+		}
 
-		RouteEntity route1014 = saveRoute("100100129", "1014", "성북구청", "동묘앞", "115");
-		RouteEntity route152 = saveRoute("100100031", "152", "성북구청", "동대문", "115");
-		RouteEntity route103 = saveRoute("100100008", "103", "성북구청", "동대문", "115");
-		RouteEntity route142 = saveRoute("100100021", "142", "성북구청", "창신동", "115");
-
-		// stopOrder의 대소관계가 직통/역방향 판정과 구간 순서를 결정한다.
-		routeStopRepository.saveAll(List.of(
-				new RouteStopEntity(route1014, origin, 10, 300),
-				new RouteStopEntity(route1014, success, 11, 500),
-				new RouteStopEntity(route1014, middle, 12, 600),
-				new RouteStopEntity(route1014, insufficient, 13, 400),
-				new RouteStopEntity(route152, origin, 20, 300),
-				new RouteStopEntity(route152, success, 21, 500),
-				new RouteStopEntity(route152, middle, 22, 600),
-				new RouteStopEntity(route152, insufficient, 23, 400),
-				new RouteStopEntity(route103, origin, 30, 300),
-				new RouteStopEntity(route103, success, 31, 500),
-				new RouteStopEntity(route103, middle, 32, 600),
-				new RouteStopEntity(route103, insufficient, 33, 400),
-				new RouteStopEntity(route142, origin, 40, 300),
-				new RouteStopEntity(route142, success, 41, 500)
-		));
+		for (DemoRoute routeData : ROUTES) {
+			RouteEntity route = saveRoute(routeData);
+			List<RouteStopEntity> routeStops = routeData.stops().stream()
+					.map(routeStop -> new RouteStopEntity(
+							route,
+							requiredStop(stopsById, routeStop.stopId()),
+							routeStop.stopOrder(),
+							null
+					))
+					.toList();
+			routeStopRepository.saveAll(routeStops);
+		}
 	}
 
-	private StopEntity saveStop(String id, String arsId, String name, String latitude, String longitude) {
+	private StopEntity saveStop(DemoStop stop) {
 		return stopRepository.save(new StopEntity(
-				id,
-				"11100",
-				"DEMO-" + id,
-				arsId,
-				name,
-				"서초구",
-				new BigDecimal(latitude),
-				new BigDecimal(longitude)
+				stop.id(),
+				SEOUL_OPERATOR_CODE,
+				"DEMO-" + stop.id(),
+				stop.arsId(),
+				stop.name(),
+				stop.districtName(),
+				new BigDecimal(stop.latitude()),
+				new BigDecimal(stop.longitude())
 		));
 	}
 
-	private RouteEntity saveRoute(
+	private RouteEntity saveRoute(DemoRoute route) {
+		return routeRepository.save(new RouteEntity(
+				route.id(),
+				SEOUL_OPERATOR_CODE,
+				"DEMO-" + route.id(),
+				route.number(),
+				"B",
+				route.startStopName(),
+				route.endStopName(),
+				"115"
+		));
+	}
+
+	private StopEntity requiredStop(Map<String, StopEntity> stopsById, String stopId) {
+		StopEntity stop = stopsById.get(stopId);
+		if (stop == null) {
+			throw new IllegalStateException("demo 노선에 등록되지 않은 정류장이 있습니다: " + stopId);
+		}
+		return stop;
+	}
+
+	private record DemoStop(
+			String id,
+			String arsId,
+			String name,
+			String districtName,
+			String latitude,
+			String longitude
+	) {
+	}
+
+	private record DemoRoute(
 			String id,
 			String number,
 			String startStopName,
 			String endStopName,
-			String transportTypeCode
+			List<DemoRouteStop> stops
 	) {
-		return routeRepository.save(new RouteEntity(
-				id,
-				"11100",
-				"DEMO-" + id,
-				number,
-				"B",
-				startStopName,
-				endStopName,
-				transportTypeCode
-		));
 	}
 
+	private record DemoRouteStop(String stopId, int stopOrder) {
+	}
 }
