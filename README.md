@@ -343,6 +343,7 @@ python data-pipeline\build_metropolitan_roster.py `
 - 모델과 기반정보 파일은 git에 없으므로 두 디렉터리를 채운 **로컬에서 `gcloud builds submit`으로 빌드**합니다. `.gcloudignore`가 업로드 목록을 관리하며, 시크릿(`.env`)은 업로드되지 않습니다.
 - 운영(prod) 스키마는 `validate`로 기동하고, 최초 1회 스키마 생성·기반정보 적재는 `backend-init` Job이 `DDL_AUTO=update` 등으로 재정의해 수행합니다.
 - 여정 예측 API는 현재 테스트 데이터 응답으로 배포하며(팀 합의), AI팀 최종 모델이 오면 `models/`를 교체하고 이미지를 다시 빌드·배포합니다.
+- 2026-08-18 최초 배포·검증 완료 — 서비스 URL·Swagger 주소·엔드포인트별 검증 결과는 [docs/DEPLOYMENT_SMOKE_TEST.md](docs/DEPLOYMENT_SMOKE_TEST.md)에 기록되어 있습니다.
 
 ## 컨벤션 메모
 
