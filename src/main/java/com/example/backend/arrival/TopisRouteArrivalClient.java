@@ -15,7 +15,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,17 +35,12 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
-/**
- * 서울시 TOPIS {@code getArrInfoByRoute} API를 호출하고 응답 XML을 정규화한다.
- *
- * <p>demo 프로필에서는 고정 테스트 데이터만 사용하므로 이 빈을 만들지 않는다.
- * 운영 연동 시 공공데이터포털 인증키 승인 상태와 서울시 표준 ID 매핑을 먼저 확인해야 한다.</p>
- */
+/** TOPIS {@code getArrInfoByRouteAll}을 호출해 노선 전체 정류장의 첫·두 번째 도착 차량을 읽는다. */
 @Component
 @ConditionalOnProperty(prefix = "app.demo", name = "enabled", havingValue = "false", matchIfMissing = true)
-public class TopisArrivalClient implements ArrivalClient {
+public class TopisRouteArrivalClient implements RouteArrivalClient {
 
-	private static final Logger log = LoggerFactory.getLogger(TopisArrivalClient.class);
+	private static final Logger log = LoggerFactory.getLogger(TopisRouteArrivalClient.class);
 	private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 	private static final DateTimeFormatter PROVIDED_AT_FORMAT = new DateTimeFormatterBuilder()
 			.appendPattern("yyyy-MM-dd HH:mm:ss")
@@ -56,7 +53,7 @@ public class TopisArrivalClient implements ArrivalClient {
 	private final Clock clock;
 	private final HttpClient httpClient;
 
-	public TopisArrivalClient(AppProperties appProperties, Clock clock) {
+	public TopisRouteArrivalClient(AppProperties appProperties, Clock clock) {
 		this.properties = appProperties.getTopis();
 		this.clock = clock;
 		this.httpClient = HttpClient.newBuilder()
@@ -65,10 +62,10 @@ public class TopisArrivalClient implements ArrivalClient {
 	}
 
 	@Override
-	public ArrivalLookupResult getArrivals(String stopId, String routeId, int stopOrder) {
+	public RouteArrivalSnapshot getRouteArrivals(String routeId) {
 		OffsetDateTime requestedAt = OffsetDateTime.now(clock);
 		if (!properties.isEnabled()) {
-			return ArrivalLookupResult.empty(ArrivalLookupStatus.DISABLED, requestedAt);
+			return RouteArrivalSnapshot.empty(ArrivalLookupStatus.DISABLED, requestedAt, routeId);
 		}
 		if (properties.getServiceKey() == null || properties.getServiceKey().isBlank()) {
 			throw new TopisApiException(
@@ -77,7 +74,7 @@ public class TopisArrivalClient implements ArrivalClient {
 			);
 		}
 
-		HttpRequest request = HttpRequest.newBuilder(requestUri(stopId, routeId, stopOrder))
+		HttpRequest request = HttpRequest.newBuilder(requestUri(routeId))
 				.timeout(properties.getRequestTimeout())
 				.header("Accept", "application/xml")
 				.GET()
@@ -88,10 +85,7 @@ public class TopisArrivalClient implements ArrivalClient {
 					HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
 			);
 			if (response.statusCode() == 401 || response.statusCode() == 403) {
-				throw new TopisApiException(
-						TopisApiException.Reason.AUTHENTICATION,
-						"서울시 버스 API 인증 또는 활용 승인을 확인해 주세요."
-				);
+				throw authenticationFailure();
 			}
 			if (response.statusCode() < 200 || response.statusCode() >= 300) {
 				throw new TopisApiException(
@@ -99,23 +93,18 @@ public class TopisArrivalClient implements ArrivalClient {
 						"서울시 버스 API가 정상 응답을 반환하지 않았습니다."
 				);
 			}
-			return parse(response.body(), requestedAt);
+			return parse(response.body(), routeId, requestedAt);
 		} catch (TopisApiException exception) {
 			throw exception;
 		} catch (InterruptedException exception) {
 			Thread.currentThread().interrupt();
-			log.warn("TOPIS arrival request interrupted stopId={} routeId={}", stopId, routeId);
 			throw new TopisApiException(
 					TopisApiException.Reason.UPSTREAM_FAILURE,
 					"서울시 버스 API 호출이 중단되었습니다."
 			);
 		} catch (Exception exception) {
-			log.warn(
-					"TOPIS arrival request failed stopId={} routeId={} cause={}",
-					stopId,
-					routeId,
-					exception.getClass().getSimpleName()
-			);
+			log.warn("TOPIS route arrival request failed routeId={} cause={}", routeId,
+					exception.getClass().getSimpleName());
 			throw new TopisApiException(
 					TopisApiException.Reason.UPSTREAM_FAILURE,
 					"서울시 버스 API 호출에 실패했습니다."
@@ -123,51 +112,55 @@ public class TopisArrivalClient implements ArrivalClient {
 		}
 	}
 
-	private URI requestUri(String stopId, String routeId, int stopOrder) {
+	private URI requestUri(String routeId) {
 		String baseUrl = properties.getBaseUrl().replaceAll("/+$", "");
-		// 포털은 Encoding/Decoding 키를 모두 제공하므로 인증키만 별도 규칙으로 인코딩한다.
 		String query = "serviceKey=" + encodeServiceKey(properties.getServiceKey())
-				+ "&stId=" + encode(stopId)
-				+ "&busRouteId=" + encode(routeId)
-				+ "&ord=" + stopOrder;
-		return URI.create(baseUrl + "/arrive/getArrInfoByRoute?" + query);
+				+ "&busRouteId=" + encode(routeId);
+		return URI.create(baseUrl + "/arrive/getArrInfoByRouteAll?" + query);
 	}
 
-	private ArrivalLookupResult parse(String body, OffsetDateTime fallbackTime) {
+	RouteArrivalSnapshot parse(String body, String requestedRouteId, OffsetDateTime fallbackTime) {
 		try {
 			Document document = secureDocumentBuilderFactory().newDocumentBuilder()
 					.parse(new InputSource(new StringReader(body)));
-			String headerCode = text(document.getDocumentElement(), "headerCd");
+			Element root = document.getDocumentElement();
+			String headerCode = text(root, "headerCd");
+			String headerMessage = text(root, "headerMsg");
 			if (!"0".equals(headerCode)) {
-				return handleApiCode(
-						headerCode,
-						text(document.getDocumentElement(), "headerMsg"),
-						fallbackTime
+				return handleApiCode(headerCode, headerMessage, requestedRouteId, fallbackTime);
+			}
+
+			NodeList items = document.getElementsByTagName("itemList");
+			if (items.getLength() == 0) {
+				return RouteArrivalSnapshot.empty(
+						ArrivalLookupStatus.NO_ARRIVAL,
+						fallbackTime,
+						requestedRouteId
 				);
 			}
 
-			OffsetDateTime providedAt = parseProvidedAt(
-					text(document.getDocumentElement(), "mkTm"),
-					fallbackTime
-			);
-			NodeList items = document.getElementsByTagName("itemList");
-			if (items.getLength() == 0) {
-				return ArrivalLookupResult.empty(ArrivalLookupStatus.NO_ARRIVAL, providedAt);
+			Map<Integer, StopArrivalSnapshot> stops = new LinkedHashMap<>();
+			OffsetDateTime providedAt = fallbackTime;
+			for (int index = 0; index < items.getLength(); index++) {
+				Element item = (Element) items.item(index);
+				int stopOrder = integer(item, "staOrd");
+				String stopId = text(item, "stId");
+				if (stopOrder <= 0 || stopId.isBlank()) {
+					continue;
+				}
+				providedAt = parseProvidedAt(text(item, "mkTm"), providedAt);
+				stops.putIfAbsent(stopOrder, new StopArrivalSnapshot(
+						stopId,
+						text(item, "stNm"),
+						stopOrder,
+						arrivals(item, requestedRouteId)
+				));
 			}
-
-			// getArrInfoByRoute는 한 itemList 안에 첫 번째·두 번째 차량 필드를 함께 내려준다.
-			Element item = (Element) items.item(0);
-			String routeId = text(item, "busRouteId");
-			String routeNumber = firstNonBlank(text(item, "rtNm"), text(item, "busRouteAbrv"));
-			String direction = text(item, "dir");
-			boolean detour = "11".equals(text(item, "deTourAt"));
-			List<BusArrival> arrivals = new ArrayList<>();
-			addArrival(arrivals, item, 1, routeId, routeNumber, direction, detour);
-			addArrival(arrivals, item, 2, routeId, routeNumber, direction, detour);
-			ArrivalLookupStatus status = arrivals.isEmpty()
-					? ArrivalLookupStatus.NO_ARRIVAL
-					: ArrivalLookupStatus.AVAILABLE;
-			return new ArrivalLookupResult(status, providedAt, arrivals);
+			ArrivalLookupStatus status = stops.values().stream()
+					.anyMatch(stop -> !stop.arrivals().isEmpty())
+					? ArrivalLookupStatus.AVAILABLE
+					: ArrivalLookupStatus.NO_ARRIVAL;
+			return new RouteArrivalSnapshot(status, providedAt, requestedRouteId, stops);
 		} catch (TopisApiException exception) {
 			throw exception;
 		} catch (Exception exception) {
@@ -178,21 +171,22 @@ public class TopisArrivalClient implements ArrivalClient {
 		}
 	}
 
-	private ArrivalLookupResult handleApiCode(
+	private RouteArrivalSnapshot handleApiCode(
 			String headerCode,
 			String headerMessage,
+			String routeId,
 			OffsetDateTime providedAt
 	) {
-		// 인증 실패도 HTTP 200으로 내려오는 경우가 있어 XML 헤더 메시지를 함께 검사한다.
 		if (headerMessage.contains("Key인증실패") || headerMessage.contains("SERVICE KEY")) {
-			throw new TopisApiException(
-					TopisApiException.Reason.AUTHENTICATION,
-					"서울시 버스 API 인증 또는 활용 승인을 확인해 주세요."
-			);
+			throw authenticationFailure();
 		}
 		return switch (headerCode) {
-			case "6" -> ArrivalLookupResult.empty(ArrivalLookupStatus.TEMPORARILY_UNAVAILABLE, providedAt);
-			case "8" -> ArrivalLookupResult.empty(ArrivalLookupStatus.SERVICE_ENDED, providedAt);
+			case "6" -> throw new TopisApiException(
+					TopisApiException.Reason.UPSTREAM_FAILURE,
+					"서울시 버스 API가 실시간 정보를 제공하지 못했습니다."
+			);
+			case "7" -> RouteArrivalSnapshot.empty(ArrivalLookupStatus.NO_ARRIVAL, providedAt, routeId);
+			case "8" -> RouteArrivalSnapshot.empty(ArrivalLookupStatus.SERVICE_ENDED, providedAt, routeId);
 			case "3", "4" -> throw new TopisApiException(
 					TopisApiException.Reason.INVALID_MAPPING,
 					"서울시 버스 API의 정류소 또는 노선 ID 매핑을 확인해 주세요."
@@ -202,6 +196,17 @@ public class TopisArrivalClient implements ArrivalClient {
 					"서울시 버스 API가 오류 코드를 반환했습니다."
 			);
 		};
+	}
+
+	private List<BusArrival> arrivals(Element item, String fallbackRouteId) {
+		String routeId = firstNonBlank(text(item, "busRouteId"), fallbackRouteId);
+		String routeNumber = firstNonBlank(text(item, "rtNm"), text(item, "busRouteAbrv"));
+		String direction = text(item, "dir");
+		boolean detour = "11".equals(text(item, "deTourAt"));
+		List<BusArrival> arrivals = new ArrayList<>(2);
+		addArrival(arrivals, item, 1, routeId, routeNumber, direction, detour);
+		addArrival(arrivals, item, 2, routeId, routeNumber, direction, detour);
+		return arrivals;
 	}
 
 	private void addArrival(
@@ -218,11 +223,7 @@ public class TopisArrivalClient implements ArrivalClient {
 		if (vehicleId == null && vehicleNumber == null) {
 			return;
 		}
-
-		String tripId = vehicleId != null
-				? vehicleId
-				: routeId + ":" + vehicleNumber;
-		// 데이터 시점에 따라 도착 초 필드가 달라 첫 번째 양수 값을 우선 사용한다.
+		String tripId = vehicleId != null ? vehicleId : routeId + ":" + vehicleNumber;
 		int arrivalSeconds = firstPositive(
 				integer(item, "traTime" + sequence),
 				integer(item, "exps" + sequence),
@@ -242,13 +243,12 @@ public class TopisArrivalClient implements ArrivalClient {
 				toArrivalMinutes(arrivalSeconds),
 				text(item, "arrmsg" + sequence),
 				"1".equals(text(item, "isLast" + sequence)),
-				"1".equals(text(item, "full" + sequence)),
+				trueValue(text(item, "full" + sequence)),
 				detour
 		));
 	}
 
 	private static DocumentBuilderFactory secureDocumentBuilderFactory() throws Exception {
-		// 외부 XML이 로컬 파일이나 네트워크 엔티티를 읽지 못하도록 XXE 기능을 모두 차단한다.
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
 		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
@@ -283,8 +283,11 @@ public class TopisArrivalClient implements ArrivalClient {
 	}
 
 	private static int toArrivalMinutes(int seconds) {
-		// FE는 분 단위로 표시하므로 남은 초를 버리지 않고 올림한다.
 		return seconds <= 0 ? 0 : (seconds + 59) / 60;
+	}
+
+	private static boolean trueValue(String value) {
+		return "1".equals(value) || "Y".equalsIgnoreCase(value);
 	}
 
 	private static String validIdentifier(String value) {
@@ -302,7 +305,6 @@ public class TopisArrivalClient implements ArrivalClient {
 		try {
 			return LocalDateTime.parse(value, PROVIDED_AT_FORMAT).atZone(SEOUL_ZONE).toOffsetDateTime();
 		} catch (RuntimeException exception) {
-			// 제공 시각 형식이 달라도 도착정보 전체를 버리지 않고 요청 시각을 기준으로 삼는다.
 			return fallback;
 		}
 	}
@@ -320,5 +322,12 @@ public class TopisArrivalClient implements ArrivalClient {
 					"서울시 버스 API Encoding 인증키 형식을 확인해 주세요."
 			);
 		}
+	}
+
+	private static TopisApiException authenticationFailure() {
+		return new TopisApiException(
+				TopisApiException.Reason.AUTHENTICATION,
+				"서울시 버스 API 인증 또는 활용 승인을 확인해 주세요."
+		);
 	}
 }

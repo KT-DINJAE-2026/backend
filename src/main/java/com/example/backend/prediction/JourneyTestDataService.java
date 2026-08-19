@@ -24,6 +24,7 @@ import com.example.backend.repository.RouteRepository;
 import com.example.backend.repository.RouteStopRepository;
 import com.example.backend.repository.StopRepository;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  * TOPIS나 실제 AI 결과로 오해하지 않도록 운영 서비스로 그대로 사용하면 안 된다.</p>
  */
 @Service
+@ConditionalOnProperty(prefix = "app.demo", name = "enabled", havingValue = "true")
 @Transactional(readOnly = true)
-public class JourneyTestDataService {
+public class JourneyTestDataService implements JourneyPredictionService {
 
 	private static final String INSUFFICIENT_REASON = "NOT_ENOUGH_HISTORICAL_SAMPLES";
 	private static final String INSUFFICIENT_DESTINATION_STOP_ID = "100000147";
@@ -71,6 +73,7 @@ public class JourneyTestDataService {
 		this.clock = clock;
 	}
 
+	@Override
 	public JourneyPredictionResponse create(JourneyPredictionRequest request) {
 		StopEntity origin = stopRepository.getRequired(request.originStopId());
 		StopEntity destination = stopRepository.getRequired(request.destinationStopId());
