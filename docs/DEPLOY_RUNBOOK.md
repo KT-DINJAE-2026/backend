@@ -45,10 +45,13 @@ Postman으로 다시 돌리고 결과 표를 갱신한다.
 
 ## 2. AI 모델을 교체할 때
 
-1. `models/`의 `model_a.pmml`·`model_b.pmml`을 새 파일로 교체
-2. **배포 전에 로컬 전체 테스트**로 입력·출력 계약 유지 확인 — 모델 파일이 있으면
-   실모델 스모크 테스트가 자동 활성화된다 ([models/README.md](../models/README.md)의
-   "모델 교체 시 재확인할 것" 체크리스트 참고)
+1. `models/`의 `model_a.pmml`·`model_b.pmml`을 새 파일로 교체하고, AI팀이 golden test
+   샘플을 함께 주면 `models/golden_test_samples.json`도 갱신
+2. **배포 전에 로컬 전체 테스트**로 입력·출력 계약 유지 확인 — 모델 파일이 있으면 실모델
+   스모크 테스트가, golden 샘플이 있으면 Python 동등성 대조(`GoldenModelRegressionTests`)가
+   자동 활성화된다 ([models/README.md](../models/README.md)의 "모델 교체 시 재확인할 것" 참고).
+   모델 크기가 바뀌면 스모크 테스트 로그의 적재 시간·상주 힙으로 Cloud Run 메모리를 재산정한다
+   (2026-08-24 최종본: 767MiB → `--memory 2Gi` 필요)
 
    ```bash
    ./gradlew test
