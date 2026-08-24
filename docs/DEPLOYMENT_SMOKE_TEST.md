@@ -10,12 +10,12 @@ GCP 시연 환경 배포 후 Postman·curl로 전 엔드포인트를 검증한 �
 | 항목 | 값 |
 |---|---|
 | 서비스 URL | `https://backend-827716553089.asia-northeast3.run.app` |
-| 리비전 | `backend-00004-2mg` (2026-08-19 — TOPIS·PMML 실연동 코드 반영) |
+| 리비전 | `backend-00007-nvz` (2026-08-24 — 최종 모델 + 공휴일 API 폴백, **메모리 4Gi + cpu-boost**) |
 | GCP 프로젝트 / 리전 | `kt-dinjae` / `asia-northeast3` |
 | 이미지 | `asia-northeast3-docker.pkg.dev/kt-dinjae/backend/backend:latest` |
 | DB | Cloud SQL `backend-mysql` (MySQL 8.0, db-f1-micro) |
 | 적재 기반정보 | 기준일 2025-04-01 — 정류장 13,307 / 노선 832 / 경유 38,709건 |
-| 모델 | PMML A/B 임시 버전 (2026-08-14 전달본, 이미지 내장) |
+| 모델 | **PMML A/B 배포용 최종본** (2026-08-24 전달, 1~12월 전체 학습, golden test 20건 통과) |
 
 ## API 문서·테스트 도구
 
@@ -24,14 +24,14 @@ GCP 시연 환경 배포 후 Postman·curl로 전 엔드포인트를 검증한 �
 - Postman: **Import → 위 OpenAPI JSON URL 붙여넣기** → "교통약자 입석 위험 안내 API" 컬렉션이
   생성된다. 요청 URL이 `{{baseUrl}}` 변수면 컬렉션 Variables에서 서비스 URL로 설정한다.
 
-## 검증 결과 (2026-08-19, 실연동 리비전, 전 항목 통과)
+## 검증 결과 (2026-08-24, 최종 모델 리비전, 전 항목 통과)
 
 | # | 요청 | 기대 | 결과 |
 |---|---|---|---|
 | 1 | `GET /health` | 200, `status: UP` | ✅ |
 | 2 | `GET /api/v1/stops/107000087/context` | 성북구청.성북경찰서 + 목적지 후보와 경유 노선 | ✅ |
 | 3 | `GET /api/v1/stops/search?originStopId=107000087&query=성북` | 이름 일치 정류장 목록 | ✅ |
-| 4 | `POST /api/v1/journeys/predictions` — `107000087→107000089` | `SUCCESS` + **실시간 응답**: 실제 차량 `tripId`, 노선 5개·차량 10대, 도착 1~18분, TOPIS ETA 기반 이동시간, PMML 입석 예측 | ✅ |
+| 4 | `POST /api/v1/journeys/predictions` — `107000087→107000089` | `SUCCESS` + 실시간 응답: 실제 차량 `tripId`, 노선 5개, **최종 모델** 입석 예측 | ✅ |
 | 5 | 같은 요청 — 목적지 `100000147` | `SUCCESS` + 실시간 예측 (구 고정 `INSUFFICIENT_DATA` 시나리오 소멸 — 아래 참고) | ✅ |
 | 6 | 같은 요청 — 존재하지 않는 정류장 `999999999` | 404, `STOP_NOT_FOUND` | ✅ |
 | 7 | 같은 요청 — `originStopId: "abc"` (형식 위반) | 400, `INVALID_REQUEST` | ✅ |
@@ -43,7 +43,19 @@ GCP 시연 환경 배포 후 Postman·curl로 전 엔드포인트를 검증한 �
 {"originStopId": "107000087", "destinationStopId": "107000089"}
 ```
 
-## 실연동 확인 사실 (2026-08-19 15:50 KST)
+## 실연동 확인 사실
+
+**2026-08-24 (최종 모델 리비전):**
+
+- **KASI 공휴일 API(apis.data.go.kr)는 Cloud Run에서 간헐 차단된다** — 연결 타임아웃 실측.
+  이 때문에 예측 API 전체가 502로 죽는 문제를 내장 공휴일 목록 폴백(PR #14)으로 해결했고,
+  배포 직후 실차단 상황에서 폴백 발동("공휴일 API 실패로 내장 목록을 사용합니다")과
+  `SUCCESS` 응답을 함께 확인했다. TOPIS(`ws.bus.go.kr`)는 차단이 관찰되지 않았다.
+- 최종 모델(259MB)은 **2GiB 배포가 적재 파싱 피크 OOM으로 실패**해 4GiB + cpu-boost로
+  운영한다. 콜드 스타트는 약 47초(모델 파싱 약 40초 포함) — 시연일 `--min-instances 1` 필수.
+- 검증 시각(일요일 14:30 KST)에는 전 차량 입석 부담 `LOW`. 혼잡 시간대 관찰은 여전히 남은 항목.
+
+**2026-08-19 15:50 KST (실연동 최초 리비전):**
 
 - **Cloud Run(구글 IP)에서 TOPIS 호출이 정상 동작한다.** 배포 전 우려였던 공공 API의
   해외·데이터센터 IP 차단은 발생하지 않았다. `getArrInfoByRouteAll` 실호출로 차량
