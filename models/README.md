@@ -7,7 +7,7 @@ AI팀에서 전달받은 PMML 모델과 부속 파일을 보관한다. 배포 �
 - 학습: 1~12월 전체 데이터, `n_estimators=3000`, `num_leaves=127`
 - 변환기: JPMML-LightGBM 1.6-SNAPSHOT, PMML 4.4
 - 크기: 두 파일 합계 약 259MB. 적재 6.6초, 상주 힙 약 767MiB 실측(2026-08-24, RealStandingModelSmokeTests
-  로그). **테스트 JVM 힙 4g(`build.gradle`), Cloud Run 메모리 2GiB 이상이 필요하다.**
+  로그). **테스트 JVM 힙 4g(`build.gradle`), Cloud Run 메모리 4GiB가 필요하다** (2GiB는 적재 중 파싱 피크로 OOM — 2026-08-24 배포 실측).
 
 ## 파일을 받는 방법
 

@@ -207,6 +207,10 @@ public class AppProperties {
 		private Duration connectTimeout = Duration.ofSeconds(3);
 		private Duration requestTimeout = Duration.ofSeconds(5);
 		private Duration cacheTtl = Duration.ofHours(24);
+		// KASI API가 일부 클라우드 대역을 차단해 실패할 때 사용할 내장 공휴일 목록(같은 KASI 원본).
+		private String fallbackResource = "classpath:holiday/kasi-holidays.csv";
+		// 폴백 결과는 짧게 캐시해 API가 복구되면 실데이터로 자동 복귀한다.
+		private Duration failureCacheTtl = Duration.ofHours(1);
 
 		public boolean isEnabled() {
 			return enabled;
@@ -214,6 +218,22 @@ public class AppProperties {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+
+		public String getFallbackResource() {
+			return fallbackResource;
+		}
+
+		public void setFallbackResource(String fallbackResource) {
+			this.fallbackResource = fallbackResource;
+		}
+
+		public Duration getFailureCacheTtl() {
+			return failureCacheTtl;
+		}
+
+		public void setFailureCacheTtl(Duration failureCacheTtl) {
+			this.failureCacheTtl = failureCacheTtl;
 		}
 
 		public String getBaseUrl() {

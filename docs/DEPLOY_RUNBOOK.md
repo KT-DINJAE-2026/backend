@@ -51,7 +51,7 @@ Postman으로 다시 돌리고 결과 표를 갱신한다.
    스모크 테스트가, golden 샘플이 있으면 Python 동등성 대조(`GoldenModelRegressionTests`)가
    자동 활성화된다 ([models/README.md](../models/README.md)의 "모델 교체 시 재확인할 것" 참고).
    모델 크기가 바뀌면 스모크 테스트 로그의 적재 시간·상주 힙으로 Cloud Run 메모리를 재산정한다
-   (2026-08-24 최종본: 767MiB → `--memory 2Gi` 필요)
+   (2026-08-24 최종본: 상주 767MiB, 파싱 피크 2GiB 초과 → `--memory 4Gi --cpu-boost` 필요. 2Gi는 OOM 실측)
 
    ```bash
    ./gradlew test

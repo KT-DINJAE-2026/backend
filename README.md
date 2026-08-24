@@ -125,6 +125,8 @@ backend/
 | `app.holiday.service-key` | `SEOUL_BUS_API_KEY` | TOPIS와 공통으로 사용하는 공공데이터포털 일반 인증키 |
 | `app.holiday.connect-timeout` / `request-timeout` | `3s` / `5s` | 공휴일 API 연결·응답 제한시간 |
 | `app.holiday.cache-ttl` | `24h` | 연도별 공휴일 목록 캐시 유지시간 |
+| `app.holiday.fallback-resource` | `classpath:holiday/kasi-holidays.csv` | KASI API 실패 시 사용할 내장 공휴일 목록(같은 KASI 원본, 2025~2027). 빈값이면 폴백 없이 예외 |
+| `app.holiday.failure-cache-ttl` | `1h` | 폴백 결과 캐시 유지시간. 만료 후 API를 재시도해 복구 시 실시간 조회로 복귀 |
 | `app.weather.enabled` | `true` | Open-Meteo 시간별 예보 사용 여부 |
 | `app.weather.base-url` | `https://api.open-meteo.com/v1/forecast` | 운영 날씨 예보 API 주소 |
 | `app.weather.connect-timeout` / `request-timeout` | `3s` / `5s` | 날씨 API 연결·응답 제한시간 |
