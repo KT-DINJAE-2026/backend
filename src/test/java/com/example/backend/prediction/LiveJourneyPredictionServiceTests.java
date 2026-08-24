@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,8 +22,10 @@ import com.example.backend.arrival.StopArrivalSnapshot;
 import com.example.backend.domain.RouteEntity;
 import com.example.backend.domain.RouteStopEntity;
 import com.example.backend.domain.StopEntity;
+import com.example.backend.headway.RealtimeHeadwayResolver;
 import com.example.backend.prediction.dto.JourneyPredictionRequest;
 import com.example.backend.prediction.dto.JourneyPredictionResponse;
+import com.example.backend.prediction.feature.PredictionModelInput;
 import com.example.backend.prediction.feature.PredictionModelInputFactory;
 import com.example.backend.prediction.model.StandingPrediction;
 import com.example.backend.prediction.model.StandingPredictor;
@@ -33,6 +36,23 @@ import com.example.backend.repository.StopRepository;
 import org.junit.jupiter.api.Test;
 
 class LiveJourneyPredictionServiceTests {
+
+	@Test
+	void passesOnlyTheSecondVehiclesPreviousEtaGapAsRealtimeHeadway() {
+		List<PredictionModelInput> inputs = new ArrayList<>();
+		Fixture fixture = fixture(input -> {
+			inputs.add(input);
+			return StandingPrediction.seated(0.2d);
+		});
+
+		fixture.service().create(
+				new JourneyPredictionRequest(fixture.origin().getId(), fixture.destination().getId())
+		);
+
+		assertThat(inputs).hasSize(2);
+		assertThat(inputs.get(0).headwaySec()).isNull();
+		assertThat(inputs.get(1).headwaySec()).isEqualTo(240L);
+	}
 
 	@Test
 	void combinesTopisArrivalTravelTimeAndPmmlPrediction() {
@@ -139,7 +159,8 @@ class LiveJourneyPredictionServiceTests {
 		);
 		Clock clock = Clock.fixed(Instant.parse("2026-08-19T05:30:00Z"), ZoneId.of("Asia/Seoul"));
 		LiveJourneyPredictionService service = new LiveJourneyPredictionService(
-				stopRepository, routeRepository, routeStopRepository, snapshots::get, inputFactory,
+				stopRepository, routeRepository, routeStopRepository, snapshots::get,
+				new RealtimeHeadwayResolver(), inputFactory,
 				input -> StandingPrediction.seated(0.2d), new JourneyTravelTimeEstimator(), clock
 		);
 
@@ -189,6 +210,7 @@ class LiveJourneyPredictionServiceTests {
 				routeRepository,
 				routeStopRepository,
 				arrivalProvider,
+				new RealtimeHeadwayResolver(),
 				inputFactory,
 				predictor,
 				new JourneyTravelTimeEstimator(),

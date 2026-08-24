@@ -17,6 +17,7 @@ import com.example.backend.domain.RouteStopEntity;
 import com.example.backend.domain.StopEntity;
 import com.example.backend.error.ApiException;
 import com.example.backend.error.ErrorCode;
+import com.example.backend.headway.RealtimeHeadwayResolver;
 import com.example.backend.prediction.JourneyTravelTimeEstimator.SegmentEstimate;
 import com.example.backend.prediction.JourneyTravelTimeEstimator.TravelEstimate;
 import com.example.backend.prediction.dto.JourneyPredictionRequest;
@@ -51,6 +52,7 @@ public class LiveJourneyPredictionService implements JourneyPredictionService {
 	private final RouteRepository routeRepository;
 	private final RouteStopRepository routeStopRepository;
 	private final RouteArrivalProvider arrivalProvider;
+	private final RealtimeHeadwayResolver realtimeHeadwayResolver;
 	private final PredictionModelInputFactory inputFactory;
 	private final StandingPredictor standingPredictor;
 	private final JourneyTravelTimeEstimator travelTimeEstimator;
@@ -61,6 +63,7 @@ public class LiveJourneyPredictionService implements JourneyPredictionService {
 			RouteRepository routeRepository,
 			RouteStopRepository routeStopRepository,
 			RouteArrivalProvider arrivalProvider,
+			RealtimeHeadwayResolver realtimeHeadwayResolver,
 			PredictionModelInputFactory inputFactory,
 			StandingPredictor standingPredictor,
 			JourneyTravelTimeEstimator travelTimeEstimator,
@@ -70,6 +73,7 @@ public class LiveJourneyPredictionService implements JourneyPredictionService {
 		this.routeRepository = routeRepository;
 		this.routeStopRepository = routeStopRepository;
 		this.arrivalProvider = arrivalProvider;
+		this.realtimeHeadwayResolver = realtimeHeadwayResolver;
 		this.inputFactory = inputFactory;
 		this.standingPredictor = standingPredictor;
 		this.travelTimeEstimator = travelTimeEstimator;
@@ -127,16 +131,20 @@ public class LiveJourneyPredictionService implements JourneyPredictionService {
 		}
 		TravelEstimate travel = travelTimeEstimator.estimate(path, snapshot);
 		int originOrder = path.getFirst().getStopOrder();
-		for (BusArrival arrival : snapshot.arrivalsAt(originOrder)) {
+		List<BusArrival> arrivals = snapshot.arrivalsAt(originOrder);
+		List<Long> headways = realtimeHeadwayResolver.headwaySeconds(snapshot, originOrder);
+		for (int index = 0; index < arrivals.size(); index++) {
+			BusArrival arrival = arrivals.get(index);
 			OffsetDateTime boardingTime = snapshot.providedAt().plusSeconds(Math.max(0, arrival.arrivalSeconds()));
+			Long headwaySec = headways.get(index);
 			PredictionModelInput input = inputFactory.createForStop(
 					route.getId(),
-					route.getNumber(),
 					origin.getId(),
 					destination.getId(),
 					origin.getLatitude(),
 					origin.getLongitude(),
-					boardingTime
+					boardingTime,
+					headwaySec
 			);
 			candidates.add(new Candidate(
 					route,
