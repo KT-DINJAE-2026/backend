@@ -144,7 +144,7 @@ gcloud builds submit --tag \
 gcloud run deploy backend \
   --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
   --region asia-northeast3 \
-  --memory 1Gi \
+  --memory 2Gi \
   --set-env-vars "SPRING_PROFILES_ACTIVE=prod,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
   --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
   --add-cloudsql-instances <PROJECT>:asia-northeast3:<INSTANCE> \
@@ -165,7 +165,7 @@ gcloud run deploy backend \
 gcloud run jobs create backend-init \
   --image asia-northeast3-docker.pkg.dev/<PROJECT>/backend/backend:latest \
   --region asia-northeast3 \
-  --memory 1Gi \
+  --memory 2Gi \
   --task-timeout=30m --max-retries=1 \
   --set-env-vars "SPRING_PROFILES_ACTIVE=prod,SPRING_MAIN_WEB_APPLICATION_TYPE=none,DDL_AUTO=update,ML_MODEL_ENABLED=false,APP_MASTER_DATA_IMPORT_ENABLED=true,MASTER_STOP_FILE=/masterdata/STTN_20250401.dat,MASTER_ROUTE_FILE=/masterdata/ROUTE_20250401.dat,MASTER_ROUTE_STOP_FILE=/masterdata/ROUTESTTN_20250401.dat,DB_USERNAME=<DB_USER>,DB_URL=jdbc:mysql:///<DB_NAME>?cloudSqlInstance=<PROJECT>:asia-northeast3:<INSTANCE>&socketFactory=com.google.cloud.sql.mysql.SocketFactory" \
   --set-secrets DB_PASSWORD=db-password:latest,SEOUL_BUS_API_KEY=topis-api-key:latest \
@@ -215,14 +215,14 @@ Cloud Run 방식에 문제가 생겼을 때의 대비책으로만 남겨둔다.
 | # | 리소스 | 권장 사양·설정 | 역할 |
 |---|---|---|---|
 | 1 | GCP 프로젝트 + 결제 계정 | 신규 계정 $300 크레딧 활성화, 리전은 전부 `asia-northeast3` | 모든 리소스의 컨테이너 |
-| 2 | Cloud Run 서비스 `backend` | 1 vCPU / **메모리 1GiB**, min 0(시연일 1) / max 2, 포트 8080, 미인증 호출 허용 | Spring Boot 백엔드 실행 |
+| 2 | Cloud Run 서비스 `backend` | 1 vCPU / **메모리 2GiB**(최종 PMML 상주 힙 767MiB 실측), min 0(시연일 1) / max 2, 포트 8080, 미인증 호출 허용 | Spring Boot 백엔드 실행 |
 | 3 | Cloud SQL 인스턴스 | **MySQL 8.0**(Enterprise 에디션 — 8.4는 Enterprise Plus 전용이라 비용상 제외), db-f1-micro, SSD 10GiB, 데이터베이스 1개 + 앱 전용 계정 | 정류장·노선 기반정보 저장 |
 | 4 | Artifact Registry 저장소 | Docker 형식, `asia-northeast3` | 백엔드 이미지 저장 |
 | 5 | Secret Manager 시크릿 | `db-password`, `topis-api-key` 2건 | 민감 정보를 코드·이미지 밖으로 분리 |
 | 6 | Cloud Run Job `backend-init` | 서비스와 같은 이미지, `app.master-data.import-enabled=true`로 실행 | 최초 1회 스키마 생성·기반정보 적재 |
 | 7 | 런타임 서비스 계정 | 역할: `roles/cloudsql.client`, `roles/secretmanager.secretAccessor` | Cloud Run이 DB·시크릿에 접근할 권한 |
 
-메모리는 1GiB를 권장한다. JVM 기본 설정에서 512MiB는 기동 중 OOM으로 죽는 경우가 흔하다.
+메모리는 2GiB가 필요하다. 2026-08-24 배포용 최종 PMML(약 259MB)은 적재 후 상주 힙이 약 767MiB라 1GiB로는 요청 처리 여유가 없다.
 
 프로젝트에서 활성화할 API (콘솔에서 켜거나 `gcloud services enable`):
 

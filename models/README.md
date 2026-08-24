@@ -3,14 +3,16 @@
 AI팀에서 전달받은 PMML 모델과 부속 파일을 보관한다. 배포 시 이 디렉터리를 Docker 이미지의
 `/models`로 복사하고 `ML_MODEL_DIR` 환경변수로 위치를 주입한다(`docs/CLOUD_ARCHITECTURE.md` 참고).
 
-- 전달일: 2026-08-14 (PMML `Header/Timestamp` 기준 `2026-08-14T04:55:35Z`)
+- 전달일: 2026-08-24, **배포용 최종본** (PMML `Header/Timestamp` 기준 `2026-08-20T18:40:36Z`)
+- 학습: 1~12월 전체 데이터, `n_estimators=3000`, `num_leaves=127`
 - 변환기: JPMML-LightGBM 1.6-SNAPSHOT, PMML 4.4
-- **주의: 하이퍼파라미터 실험 중인 임시 버전이다. 최종본으로 교체 예정.**
+- 크기: 두 파일 합계 약 259MB. 적재 6.6초, 상주 힙 약 767MiB 실측(2026-08-24, RealStandingModelSmokeTests
+  로그). **테스트 JVM 힙 4g(`build.gradle`), Cloud Run 메모리 2GiB 이상이 필요하다.**
 
 ## 파일을 받는 방법
 
 모델 파일은 용량이 커서 git에 포함하지 않는다(`.gitignore`에서 `models/*`를 제외하고 이 README만
-커밋한다). AI팀이 팀 채팅으로 공유한 파일 네 개를 이 디렉터리에 그대로 내려받으면 된다.
+커밋한다). AI팀이 공유한 파일 다섯 개를 이 디렉터리에 그대로 내려받으면 된다.
 
 이 때문에 GitHub Actions처럼 저장소만 체크아웃하는 환경에서는 이미지 빌드가 실패한다. 현재 설계대로
 로컬에서 `gcloud builds submit`으로 배포하면 로컬 디렉터리가 업로드되므로 문제가 없다. 나중에 배포를
@@ -22,6 +24,7 @@ CI로 자동화한다면 그때 모델 파일 전달 방법(GCS 등)을 먼저 �
 | `model_b.pmml` | 입석 지속시간(초) 회귀 | 사용 |
 | `category_code_mapping_model_a.json` | 범주값 → 정수 코드 표 | **사용 안 함** (아래 참고) |
 | `category_code_mapping_model_b.json` | 위와 바이트 단위로 동일한 파일 | **사용 안 함** |
+| `golden_test_samples.json` | Python 원본 추론 기대값 20건 (common 10·rare 5·boundary 5) | 테스트에서 사용 |
 
 ## 검증된 입력 계약
 
@@ -99,8 +102,8 @@ FE 데모 시나리오에 쓰는 정류장 `107000087`·`107000089`·`100000147`
 
 `demo`가 아닌 프로필의 `/api/v1/journeys/predictions`는 TOPIS 차량별 도착 예정 시각으로
 8개 피처를 생성해 이 PMML 예측기를 직접 호출한다. 학습 범위 밖 입력과 모델 미적재 상태는
-실시간 도착·이동시간을 유지한 `INSUFFICIENT_DATA`로 변환한다. 현재 파일은 임시 모델이므로
-최종본을 받으면 아래 계약과 golden test를 다시 확인해야 한다.
+실시간 도착·이동시간을 유지한 `INSUFFICIENT_DATA`로 변환한다. 2026-08-24부터 배포용 최종
+모델이 연결되어 있으며 golden test로 Python 원본과의 동등성이 확인됐다.
 
 ## 모델 교체 시 재확인할 것
 
@@ -111,4 +114,5 @@ FE 데모 시나리오에 쓰는 정류장 `107000087`·`107000089`·`100000147`
 - 피처 8개의 이름·타입이 그대로인지
 - `probability(1)`과 초 단위 회귀 출력이 유지되는지
 - 노선·정류장 도메인 변화
-- golden test 결과 일치 (아직 미전달, AI팀에 요청 필요)
+- golden test 결과 일치 — `GoldenModelRegressionTests`가 `golden_test_samples.json`의 20건을
+  자동 대조한다(확률 1e-4·초 0.02 허용 오차). 2026-08-24 최종본에서 전건 통과
