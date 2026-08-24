@@ -10,7 +10,7 @@ GCP 시연 환경 배포 후 Postman·curl로 전 엔드포인트를 검증한 �
 | 항목 | 값 |
 |---|---|
 | 서비스 URL | `https://backend-827716553089.asia-northeast3.run.app` |
-| 리비전 | `backend-00007-nvz` (2026-08-24 — 최종 모델 + 공휴일 API 폴백, **메모리 4Gi + cpu-boost**) |
+| 리비전 | `backend-00009-4kf` (2026-08-24 — 최종 모델 + 공휴일 폴백 + TOPIS ETA 실시간 배차간격, **메모리 4Gi + cpu-boost**) |
 | GCP 프로젝트 / 리전 | `kt-dinjae` / `asia-northeast3` |
 | 이미지 | `asia-northeast3-docker.pkg.dev/kt-dinjae/backend/backend:latest` |
 | DB | Cloud SQL `backend-mysql` (MySQL 8.0, db-f1-micro) |
@@ -45,7 +45,18 @@ GCP 시연 환경 배포 후 Postman·curl로 전 엔드포인트를 검증한 �
 
 ## 실연동 확인 사실
 
-**2026-08-24 (최종 모델 리비전):**
+**2026-08-24 저녁 (실시간 배차간격 리비전 `backend-00009-4kf`, PR #16):**
+
+- `headway_sec`가 결측 고정에서 **TOPIS ETA 기반 실시간 간격**으로 바뀌었다. 두 번째 도착
+  차량은 같은 스냅샷의 `ETA2-ETA1`, 첫 번째 차량은 이전 조회 이력으로 직전 차량 간격을
+  계산하며, 연결 확인이 안 되면 결측 유지. 이력은 인스턴스 메모리 보관이라 콜드 스타트·
+  다중 인스턴스에서는 첫 차량이 결측일 수 있다(정상 동작).
+- 연속 호출 검증: 두 호출 모두 `SUCCESS`, 차량별 ETA가 실시간으로 감소(7→6분 등),
+  272번 차량 입석 3분 `MEDIUM` 예측 관찰(일요일 18:40 KST).
+- `HEADWAY_SCHEDULE_ENABLED=false` env는 계획 배차간격 공급자만 끄므로 실시간 계산과
+  충돌하지 않는다.
+
+**2026-08-24 낮 (최종 모델 리비전):**
 
 - **KASI 공휴일 API(apis.data.go.kr)는 Cloud Run에서 간헐 차단된다** — 연결 타임아웃 실측.
   이 때문에 예측 API 전체가 502로 죽는 문제를 내장 공휴일 목록 폴백(PR #14)으로 해결했고,
