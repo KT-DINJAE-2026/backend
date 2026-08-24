@@ -131,7 +131,7 @@ backend/
 | `app.weather.base-url` | `https://api.open-meteo.com/v1/forecast` | 운영 날씨 예보 API 주소 |
 | `app.weather.connect-timeout` / `request-timeout` | `3s` / `5s` | 날씨 API 연결·응답 제한시간 |
 | `app.weather.cache-ttl` | `15m` | 0.1도 격자·일자별 시간 예보 캐시 유지시간 |
-| `app.headway.enabled` | `true` (`HEADWAY_SCHEDULE_ENABLED`) | 서울시 계획 배차간격 조회 사용 여부 |
+| `app.headway.enabled` | `false` (`HEADWAY_SCHEDULE_ENABLED`) | 계획 배차간격을 모델 입력으로 쓸지 여부. AI팀 권고로 기본 비활성 — `headway_sec`는 결측 입력 (models/README.md 참고) |
 | `app.headway.schedule-resource` | `classpath:headway/seoul-bus-headway-20260804.csv` | 노선번호별 평일·토요일·공휴일 배차간격(초) 자료 |
 | `app.model.enabled` | `true` (`ML_MODEL_ENABLED`) | 입석 예측 PMML 적재 여부. 모델 파일이 없는 환경에서는 꺼야 합니다 |
 | `app.model.directory` | `models` (`ML_MODEL_DIR`) | PMML 파일이 있는 디렉터리. 배포 이미지에서는 `/models` |
