@@ -18,6 +18,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.core.io.DefaultResourceLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +43,7 @@ class KasiHolidayClientTests {
 		appProperties.getHoliday().setBaseUrl("http://localhost:" + server.getAddress().getPort());
 		appProperties.getHoliday().setServiceKey("test+/=");
 		Clock clock = Clock.fixed(Instant.parse("2026-08-14T00:00:00Z"), ZoneId.of("Asia/Seoul"));
-		client = new KasiHolidayClient(appProperties, clock);
+		client = new KasiHolidayClient(appProperties, clock, new DefaultResourceLoader());
 	}
 
 	@AfterEach
@@ -84,6 +85,8 @@ class KasiHolidayClientTests {
 
 	@Test
 	void mapsPortalRateLimitSeparatelyFromAuthentication() {
+		// 한도 초과는 내장 목록 폴백 대상이라, 여기서는 폴백을 끄고 원인 매핑만 검증한다.
+		appProperties.getHoliday().setFallbackResource("");
 		responseBody.set("""
 				<OpenAPI_ServiceResponse>
 				  <cmmMsgHeader>
