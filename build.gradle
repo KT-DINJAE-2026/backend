@@ -49,4 +49,7 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 최종 PMML(약 260MB, n_estimators=3000)은 적재 시 힙을 크게 쓰므로 기본 512MB로는
+	// 실모델 스모크 테스트가 OOM으로 죽는다. 상주량 실측은 RealStandingModelSmokeTests 로그 참고.
+	maxHeapSize = '4g'
 }
