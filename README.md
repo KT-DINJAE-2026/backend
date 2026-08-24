@@ -131,7 +131,7 @@ backend/
 | `app.weather.base-url` | `https://api.open-meteo.com/v1/forecast` | 운영 날씨 예보 API 주소 |
 | `app.weather.connect-timeout` / `request-timeout` | `3s` / `5s` | 날씨 API 연결·응답 제한시간 |
 | `app.weather.cache-ttl` | `15m` | 0.1도 격자·일자별 시간 예보 캐시 유지시간 |
-| `app.headway.enabled` | `false` (`HEADWAY_SCHEDULE_ENABLED`) | 계획 배차간격을 모델 입력으로 쓸지 여부. AI팀 권고로 기본 비활성 — `headway_sec`는 결측 입력 (models/README.md 참고) |
+| `app.headway.enabled` | `false` (`HEADWAY_SCHEDULE_ENABLED`) | 계획 배차간격 CSV 공급자 사용 여부. 운영 여정은 이 값과 무관하게 TOPIS 실시간 ETA 차이를 사용하므로 기본 비활성 |
 | `app.headway.schedule-resource` | `classpath:headway/seoul-bus-headway-20260804.csv` | 노선번호별 평일·토요일·공휴일 배차간격(초) 자료 |
 | `app.model.enabled` | `true` (`ML_MODEL_ENABLED`) | 입석 예측 PMML 적재 여부. 모델 파일이 없는 환경에서는 꺼야 합니다 |
 | `app.model.directory` | `models` (`ML_MODEL_DIR`) | PMML 파일이 있는 디렉터리. 배포 이미지에서는 `/models` |
@@ -266,7 +266,7 @@ models/
 | `route_id`, `board_stop_id`, `alight_stop_id` | categorical / integer | 표준 ID를 **정수로** (예: `100100129`) |
 | `weekday` | categorical / string | `월`~`일` 한글 요일 |
 | `weather` | categorical / string | `맑음`, `구름많음`, `흐림`, `비`, `눈` |
-| `hour`, `is_holiday`, `headway_sec` | continuous / double | `is_holiday`는 1.0·0.0, `headway_sec`는 결측 허용 |
+| `hour`, `is_holiday`, `headway_sec` | continuous / double | `is_holiday`는 1.0·0.0. 첫 차량은 이전 스냅샷 이력이 있으면 직전 차량 간격, 없으면 결측. 두 번째 차량은 TOPIS `ETA2 - ETA1` |
 
 ### 학습 범위 검사
 
@@ -280,11 +280,11 @@ models/
 
 ### 운영 여정 API 연결
 
-demo가 아닌 프로필의 `/api/v1/journeys/predictions`는 TOPIS 실시간 도착정보로 차량별 승차 예정 시각을 만들고, 이 시각과 정류장 좌표로 공휴일·날씨·계획 배차간격을 계산해 PMML 예측기를 호출합니다. 입석시간은 전체 여정시간을 넘지 않게 보정하고, 0초·5분 이하·5분 초과를 각각 `LOW`·`MEDIUM`·`HIGH`로 변환합니다. 학습 범위 밖이거나 모델이 없으면 실시간 도착·이동시간은 유지하고 `INSUFFICIENT_DATA`로 반환합니다.
+demo가 아닌 프로필의 `/api/v1/journeys/predictions`는 TOPIS 실시간 도착정보로 차량별 승차 예정 시각과 배차간격을 만들고, 이 시각과 정류장 좌표로 공휴일·날씨를 계산해 PMML 예측기를 호출합니다. 두 번째 차량은 같은 스냅샷의 `ETA2 - ETA1`을 사용합니다. 첫 번째 차량은 이전 스냅샷에서 두 번째 차량으로 관측된 이력이 있으면 앞 차량의 마지막 예상 도착시각과 현재 ETA 차이를 사용하고, 연결을 확인할 수 없으면 `headway_sec=null`입니다. 입석시간은 전체 여정시간을 넘지 않게 보정하고, 0초·5분 이하·5분 초과를 각각 `LOW`·`MEDIUM`·`HIGH`로 변환합니다. 학습 범위 밖이거나 모델이 없으면 실시간 도착·이동시간은 유지하고 `INSUFFICIENT_DATA`로 반환합니다.
 
 2026-08-24 배포용 최종 모델(1~12월 전체 학습)로 교체했고, AI팀이 전달한 golden test 20건을 `GoldenModelRegressionTests`가 자동 대조해 Python 원본과의 동등성을 확인했습니다. `confidence`는 AI팀 산정 기준이 없어 예측 성공 시 일단 `MEDIUM`으로 반환합니다.
 
-배차간격 자료는 `1014`, `103`, `142` 같은 표시 노선번호로 조회하지만 PMML의 `route_id`는 기존 표준 노선 ID를 그대로 사용합니다. 평일·토요일·공휴일 값을 분리해 선택하고 원본의 분 단위를 초로 변환했습니다. 다만 이 값은 노선별 계획 평균이고 학습 데이터는 승차 태그로 추정한 이전 운행회차 간격이므로 정의가 다릅니다. 현재는 운영 대체값으로 사용하고 최종 모델은 같은 계획 배차간격 정의로 다시 학습하는 것이 안전합니다. 파생 자료와 규칙은 [headway 리소스 문서](src/main/resources/headway/README.md)에 있습니다.
+계획 배차간격은 학습 데이터와 정의가 달라 운영 예측에 사용하지 않습니다. 두 번째 도착 차량은 TOPIS가 같은 시점에 제공한 첫 번째·두 번째 차량의 초 단위 ETA 차이를 직전 차량 간격으로 사용합니다. 첫 번째 차량은 `(routeId, stopOrder)`별 이전 스냅샷을 최대 6시간 보관해 차량 순서 전환을 확인한 경우에만 계산합니다. 콜드 스타트·희소 조회·다른 인스턴스에서는 이력이 없으므로 결측입니다. 학습값도 실제 도착시각이 아니라 운행회차의 첫 승차 태그 시각 차이라는 한계가 있으므로, 실시간 값과 학습 분포를 비교해 모델 영향을 계속 검증해야 합니다. 계획 자료와 결정 기록은 [headway 리소스 문서](src/main/resources/headway/README.md)에 있습니다.
 
 ## 기반정보 적재
 
@@ -333,7 +333,7 @@ python data-pipeline\build_metropolitan_roster.py `
 1. MySQL 기반정보에서 출발→도착 순서로 운행하는 직통 노선과 정류장 경로를 조회합니다.
 2. 노선별 TOPIS 전체 도착정보에서 출발 정류장의 첫·두 번째 차량을 최대 2대까지 가져옵니다. 전체 개수로 다시 잘라 특정 직통 노선을 누락시키지 않습니다.
 3. 같은 차량 ID의 인접 정류장 ETA 차이로 구간 이동시간을 계산합니다. 공통 차량 ETA가 없으면 `route_stop.section_distance`를 시속 15km로 나눈 값, 거리도 없으면 구간당 120초를 대체값으로 사용합니다.
-4. 승차 예정 시각의 요일·공휴일·시각·날씨·계획 배차간격과 노선·정류장 ID를 PMML A/B에 넣습니다.
+4. 승차 예정 시각의 요일·공휴일·시각·날씨와 TOPIS 실시간 배차간격, 노선·정류장 ID를 PMML A/B에 넣습니다. 첫 차량은 이전 스냅샷 이력이 없으면 배차간격을 결측으로 둡니다.
 5. 입석 예측을 FE 계약의 전체 부담 단계와 정류장 사이 구간별 입석 상태로 변환합니다.
 
 즉 도착 예정·차량 ID·저상 여부는 TOPIS 실시간 값이고, 입석 여부·시간은 PMML 예측값입니다. 이동시간은 가능하면 실시간 ETA 차이를 쓰지만 일부 구간은 위 3번의 대체값이 사용될 수 있습니다. 응답 필드는 바꾸지 않았으며, 학습 범위 밖은 `INSUFFICIENT_DATA`로 구분합니다. FE가 여정 단위 상태를 사용하므로 하나라도 예측할 수 없는 차량이 있으면 전체를 `INSUFFICIENT_DATA`로 표시하되, 모든 직통 노선의 도착·이동시간은 유지합니다.
