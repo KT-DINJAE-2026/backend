@@ -349,6 +349,7 @@ python data-pipeline\build_metropolitan_roster.py `
 - 2026-08-18에 배포된 현재 Cloud Run 리비전은 기존 테스트 응답입니다. TOPIS·PMML 여정 연결 코드를 main에 병합한 뒤 이미지를 다시 빌드·배포해야 운영 응답이 바뀝니다.
 - 2026-08-18 최초 배포·검증 완료 — 서비스 URL·Swagger 주소·엔드포인트별 검증 결과는 [docs/DEPLOYMENT_SMOKE_TEST.md](docs/DEPLOYMENT_SMOKE_TEST.md)에 기록되어 있습니다.
 - 코드·모델·기반정보 수정 후 재배포 절차와 롤백 방법은 [docs/DEPLOY_RUNBOOK.md](docs/DEPLOY_RUNBOOK.md)를 따릅니다.
+- 다른 컴퓨터에서 로컬 실험·GCP 작업을 이어가려면 [docs/NEW_MACHINE_SETUP.md](docs/NEW_MACHINE_SETUP.md)를 따릅니다 (git에 없는 모델·기반정보·시크릿은 이동용 zip으로 옮깁니다).
 
 ## 컨벤션 메모
 
